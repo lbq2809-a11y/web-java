@@ -1,0 +1,155 @@
+version: '3.8'
+
+services:
+  # ===== MYSQL DATABASES =====
+  mysql-auth:
+    image: mysql:8.0
+    container_name: mysql-auth
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: auth_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-auth-data:/var/lib/mysql
+
+  mysql-medicine:
+    image: mysql:8.0
+    container_name: mysql-medicine
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: medicine_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql-medicine-data:/var/lib/mysql
+
+  mysql-prescription:
+    image: mysql:8.0
+    container_name: mysql-prescription
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: prescription_db
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql-prescription-data:/var/lib/mysql
+
+  mysql-order:
+    image: mysql:8.0
+    container_name: mysql-order
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: order_db
+    ports:
+      - "3310:3306"
+    volumes:
+      - mysql-order-data:/var/lib/mysql
+
+  mysql-payment:
+    image: mysql:8.0
+    container_name: mysql-payment
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: payment_db
+    ports:
+      - "3311:3306"
+    volumes:
+      - mysql-payment-data:/var/lib/mysql
+
+  mysql-consultation:
+    image: mysql:8.0
+    container_name: mysql-consultation
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: consultation_db
+    ports:
+      - "3312:3306"
+    volumes:
+      - mysql-consultation-data:/var/lib/mysql
+
+  mysql-recommendation:
+    image: mysql:8.0
+    container_name: mysql-recommendation
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: recommendation_db
+    ports:
+      - "3313:3306"
+    volumes:
+      - mysql-recommendation-data:/var/lib/mysql
+
+  mysql-inventory:
+    image: mysql:8.0
+    container_name: mysql-inventory
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: inventory_db
+    ports:
+      - "3314:3306"
+    volumes:
+      - mysql-inventory-data:/var/lib/mysql
+
+  # ===== CACHE =====
+  redis:
+    image: redis:7
+    container_name: redis-cache
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # ===== KAFKA (KRaft mode - không cần Zookeeper riêng) =====
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    restart: always
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  # ===== KAFKA UI (tùy chọn - giúp xem topic/message trực quan, rất hữu ích khi demo đồ án) =====
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    restart: always
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      - kafka
+
+volumes:
+  mysql-auth-data:
+  mysql-medicine-data:
+  mysql-prescription-data:
+  mysql-order-data:
+  mysql-payment-data:
+  mysql-consultation-data:
+  mysql-recommendation-data:
+  mysql-inventory-data:
+  kafka-data:
+

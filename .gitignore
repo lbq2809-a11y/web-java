@@ -1,0 +1,27 @@
+# Java / Maven
+target/
+*.class
+*.jar
+
+# Node
+node_modules/
+dist/
+build/
+
+# Python
+__pycache__/
+venv/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Environment
+.env
+application-local.properties
+
+# OS
+.DS_Store
+Thumbs.db
