@@ -3,7 +3,7 @@
 ## Công nghệ bắt buộc
 Java 21, Quarkus (bản ổn định mới nhất, ghi rõ trong pom.xml), Maven.
 REST: quarkus-rest + quarkus-rest-jackson, OpenAPI: quarkus-smallrye-openapi.
-JWT: SmallRye JWT (tự viết auth-service, KHÔNG dùng Keycloak), mật khẩu băm BCrypt.
+JWT: SmallRye JWT (tự viết auth-service, KHÔNG dùng Keycloak), mật khẩu băm BCrypt. Hợp đồng claims và khóa RSA dùng chung xem tại `docs/JWT-CONTRACT.md`.
 PostgreSQL: Hibernate ORM Panache + Flyway (không để Hibernate tự sinh bảng).
 MongoDB: quarkus-mongodb-panache. Redis: quarkus-redis-client.
 Kafka: quarkus-messaging-kafka. Email: quarkus-mailer. WebSocket: quarkus-websockets-next.
