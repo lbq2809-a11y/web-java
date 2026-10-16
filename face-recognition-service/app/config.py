@@ -1,7 +1,8 @@
-DB_HOST = "localhost"
-DB_PORT = 3307  # dùng chung DB với auth-service, hoặc tạo DB riêng nếu cần
-DB_NAME = "auth_db"
-DB_USER = "root"
-DB_PASSWORD = "123456"
+import os
 
-SERVICE_PORT = 5000
+# Cấu hình kết nối MongoDB riêng cho Face Recognition Service (face_db)
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+DB_NAME = os.getenv("MONGODB_DATABASE", "face_db")
+
+# Cổng chạy service theo quy định trong GEMINI.md
+SERVICE_PORT = int(os.getenv("SERVICE_PORT", "8090"))
