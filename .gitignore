@@ -22,9 +22,6 @@ venv/
 .env
 application-local.properties
 
-# JWT Private Keys (không commit khóa bí mật)
-keys/privateKey.pem
-**/privateKey.pem
 
 # OS
 .DS_Store
