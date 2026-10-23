@@ -46,6 +46,18 @@ public class ApiException extends RuntimeException {
         return new ApiException("NOT_FOUND", message, Response.Status.NOT_FOUND);
     }
 
+    public static ApiException notFound(String code, String message) {
+        return new ApiException(code, message, Response.Status.NOT_FOUND);
+    }
+
+    public static ApiException conflict(String code, String message) {
+        return new ApiException(code, message, Response.Status.CONFLICT);
+    }
+
+    public static ApiException tooManyRequests(String code, String message) {
+        return new ApiException(code, message, Response.Status.TOO_MANY_REQUESTS);
+    }
+
     public String getCode() {
         return code;
     }
@@ -58,4 +70,3 @@ public class ApiException extends RuntimeException {
         return status;
     }
 }
-
