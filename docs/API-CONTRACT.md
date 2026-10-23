@@ -19,7 +19,7 @@ Tài liệu này quy định chuẩn giao tiếp đồng bộ (**REST Client**) 
 | `Idempotency-Key` | Bắt buộc khi đặt hàng | Chuỗi UUID do client sinh khi gọi `POST /api/v1/orders` (checkout) để chống đặt trùng đơn hàng khi mạng chập chờn hoặc người dùng bấm đúp. |
 
 ### 1.3. Định dạng phản hồi lỗi thống nhất
-Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `500`, `503`) từ tất cả các service đều trả về cấu trúc JSON thống nhất:
+Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`, `503`) từ tất cả các service đều trả về cấu trúc JSON thống nhất:
 ```json
 {
   "code": "ERROR_CODE_UPPER_SNAKE_CASE",
@@ -214,6 +214,122 @@ Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `500`, `503`) từ t
 
 ---
 
+### 2.4. `auth-service` (Đăng nhập bằng mã QR - `http://localhost:8082`)
+*(Giai đoạn 3 theo `docs/B2-auth-service.md` & `docs/JWT-CONTRACT.md`)*
+
+#### (A) Tạo phiên đăng nhập QR mới
+- **Caller**: Trình duyệt Web / Client (qua `api-gateway` hoặc trực tiếp `auth-service`).
+- **Method & Path**: `POST /api/v1/auth/qr/session`
+- **Headers**:
+  - `X-Forwarded-For`: `<Client-IP>` *(tùy chọn; dùng để giới hạn tần suất 10 phiên/phút theo IP)*.
+- **Request Body**: Trống.
+- **Response thành công (`201 Created` - `CreateQrSessionResponse`)**:
+  ```json
+  {
+    "sessionId": "4b684cb3-074d-4074-b593-9c8da4c424a7",
+    "pollSecret": "a8f3b194d2e7c4f68153b92c019d45e7",
+    "qrContent": "4b684cb3-074d-4074-b593-9c8da4c424a7",
+    "status": "PENDING",
+    "expiresAt": "2026-10-23T14:15:00Z"
+  }
+  ```
+  *(Ghi chú: `qrContent` chỉ chứa `sessionId` để hiển thị mã QR trên Web, tuyệt đối không chứa `pollSecret`)*.
+- **Mã lỗi**:
+  - `429 Too Many Requests` (`TOO_MANY_REQUESTS`): Vượt quá giới hạn tạo phiên 10 phiên/phút từ cùng một IP.
+
+#### (B) Kiểm tra trạng thái phiên QR (HTTP Polling)
+- **Caller**: Trình duyệt Web / Client.
+- **Method & Path**: `GET /api/v1/auth/qr/session/{sessionId}`
+- **Path Parameter**: `sessionId` (`String` UUID).
+- **Headers**:
+  - `X-QR-Secret`: `<pollSecret>` *(Bắt buộc; phải khớp chính xác với `pollSecret` khi tạo phiên)*.
+- **Response thành công khi phiên đang chờ (`200 OK`)**:
+  ```json
+  {
+    "sessionId": "4b684cb3-074d-4074-b593-9c8da4c424a7",
+    "status": "PENDING"
+  }
+  ```
+- **Response thành công khi phiên đã được xác nhận (`200 OK` - `QrSessionStatusResponse`)**:
+  ```json
+  {
+    "sessionId": "4b684cb3-074d-4074-b593-9c8da4c424a7",
+    "status": "CONFIRMED",
+    "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 86400,
+    "user": {
+      "id": "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "email": "khach_hang@pharmacy.local",
+      "fullName": "Nguyễn Văn Khách",
+      "phone": "0901234567",
+      "role": "KHACH_HANG",
+      "active": true,
+      "createdAt": "2026-10-15T08:00:00Z"
+    }
+  }
+  ```
+  *(Ghi chú: Token chỉ trả một lần duy nhất; ngay sau khi trả token, phiên sẽ bị xóa khỏi Redis. Lần gọi tiếp theo sẽ trả về `404 QR_SESSION_NOT_FOUND`)*.
+- **Mã lỗi**:
+  - `403 Forbidden` (`FORBIDDEN`): Thiếu header `X-QR-Secret` hoặc sai `pollSecret`.
+  - `404 Not Found` (`QR_SESSION_NOT_FOUND`): Phiên QR không tồn tại hoặc đã hết hạn TTL.
+
+#### (C) Thiết bị di động xác nhận phiên đăng nhập QR
+- **Caller**: Ứng dụng di động (sau khi người dùng đã đăng nhập và quét mã QR).
+- **Method & Path**: `POST /api/v1/auth/qr/confirm`
+- **Headers**:
+  - `Authorization`: `Bearer <JWT>` *(Bắt buộc; danh tính người dùng lấy từ claim `sub` của JWT)*.
+- **Request Body (`ConfirmQrRequest`)**:
+  ```json
+  {
+    "sessionId": "4b684cb3-074d-4074-b593-9c8da4c424a7"
+  }
+  ```
+- **Response thành công (`200 OK` - `ConfirmQrResponse`)**:
+  ```json
+  {
+    "status": "CONFIRMED"
+  }
+  ```
+- **Mã lỗi**:
+  - `400 Bad Request` (`BAD_REQUEST`): Thiếu hoặc sai định dạng `sessionId`.
+  - `401 Unauthorized` (`UNAUTHORIZED`): Thiếu hoặc sai JWT Bearer.
+  - `404 Not Found` (`QR_SESSION_NOT_FOUND`): Phiên QR không tồn tại hoặc đã hết hạn TTL.
+  - `409 Conflict` (`QR_SESSION_ALREADY_CONFIRMED`): Phiên QR đã được thiết bị khác xác nhận trước đó.
+
+#### (D) Kênh thời gian thực WebSocket (Nhận kết quả trực tiếp)
+- **URL**: `ws://localhost:8082/ws/qr/{sessionId}?secret=<pollSecret>`
+- **Ghi chú**: Trình duyệt kết nối trực tiếp tới `auth-service` (cổng `8082`), không qua API Gateway.
+- **Bắt tay**: Sai hoặc thiếu tham số `secret` sẽ bị từ chối kết nối ngay lập tức (mã đóng `1008 Policy Violation`).
+- **Sự kiện đẩy khi xác nhận thành công**:
+  ```json
+  {
+    "status": "CONFIRMED",
+    "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 86400,
+    "user": {
+      "id": "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "email": "khach_hang@pharmacy.local",
+      "fullName": "Nguyễn Văn Khách",
+      "phone": "0901234567",
+      "role": "KHACH_HANG",
+      "active": true,
+      "createdAt": "2026-10-15T08:00:00Z"
+    }
+  }
+  ```
+  *(Sau khi gửi message, phiên bị xóa khỏi Redis và kết nối WebSocket tự động đóng)*.
+- **Sự kiện đẩy khi phiên hết hạn**:
+  ```json
+  {
+    "status": "EXPIRED"
+  }
+  ```
+  *(Sau khi gửi message, kết nối WebSocket tự động đóng)*.
+
+---
+
 ## 3. Hợp Đồng Sự Kiện Apache Kafka (`localhost:9092`)
 
 - **Broker**: `localhost:9092`
@@ -386,4 +502,3 @@ Khi đối chiếu giữa các file `docs/B2..B6.md` và `application.properties
 4. **Thống nhất tên Kafka Topic dùng dấu chấm (`.`) thay cho dấu gạch ngang (`-`)**:
    - Trong `docs/B3..B6.md` ghi tên topic dùng dấu chấm (`order.created`, `payment.completed`, `prescription.reviewed`, `user.password-reset-requested`, `order.status-changed`), còn trong `application.properties` khung cũ của `order-service`/`payment-service`/`notification-service` đang để `order-created` và `payment-completed`.
    - Khi triển khai tới bước B4, B5, B6, mình sẽ chuẩn hóa toàn bộ `application.properties` của các service đó sang **dấu chấm (`.`)** theo đúng `docs/B3..B6.md` và file `docs/API-CONTRACT.md` này nhé?
-
