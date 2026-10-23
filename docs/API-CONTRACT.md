@@ -348,6 +348,10 @@ Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`, `503`)
 | 4 | `payment.failed` | `payment-service` *(Outbox)* | `order-service`, `notification-service` | Ghi nhận thanh toán thất bại để khách thanh toán lại hoặc hủy đơn. |
 | 5 | `prescription.reviewed` | `prescription-service` | `notification-service` | Thông báo cho khách biết đơn thuốc đã được dược sĩ duyệt (`DA_DUYET`) hay từ chối (`TU_CHOI`). |
 | 6 | `user.password-reset-requested` | `auth-service` | `notification-service` | Gửi email chứa mã/link đặt lại mật khẩu (TTL từ Redis) qua MailHog. |
+| 7 | `inventory.reserved` | `inventory-service` | `order-service` | Báo đã giữ hàng thành công cho đơn. |
+| 8 | `inventory.reservation-failed` | `inventory-service` | `order-service` | Báo hết hàng, order-service chuyển đơn sang `DA_HUY`. |
+| 9 | `inventory.low-stock` | `inventory-service` | `notification-service` | Cảnh báo thuốc sắp hết hàng cho nhân viên. |
+| 10 | `inventory.near-expiry` | `inventory-service` | `notification-service` | Cảnh báo lô thuốc sắp hết hạn cho nhân viên. |
 
 ---
 
@@ -481,7 +485,78 @@ Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`, `503`)
   "expiresInMinutes": 15
 }
 ```
+#### 3.7. Topic `inventory.reserved`
+- **Producer**: `inventory-service`
+- **Consumer**: `order-service`
+```json
+{
+  "eventId": "777e8400-e29b-41d4-a716-446655440007",
+  "eventType": "inventory.reserved",
+  "occurredAt": "2026-10-17T10:15:32Z",
+  "correlationId": "corr-8899-aabb",
+  "orderId": "990e8400-e29b-41d4-a716-446655440222",
+  "items": [
+    { "medicineId": "6ad23be6c034632667baaa05", "quantity": 2 }
+  ]
+}
+```
 
+#### 3.8. Topic `inventory.reservation-failed`
+- **Producer**: `inventory-service`
+- **Consumer**: `order-service`
+```json
+{
+  "eventId": "888e8400-e29b-41d4-a716-446655440008",
+  "eventType": "inventory.reservation-failed",
+  "occurredAt": "2026-10-17T10:15:32Z",
+  "correlationId": "corr-8899-aabb",
+  "orderId": "990e8400-e29b-41d4-a716-446655440222",
+  "reason": "OUT_OF_STOCK",
+  "unavailableItems": [
+    { "medicineId": "6ad23be6c034632667baaa05", "requested": 2, "available": 1 }
+  ]
+}
+```
+
+#### 3.9. Topic `inventory.low-stock`
+- **Producer**: `inventory-service` (job định kỳ, `correlationId` = null)
+- **Consumer**: `notification-service` (gửi tới email nhân viên cấu hình `notification.staff-email`)
+```json
+{
+  "eventId": "999e8400-e29b-41d4-a716-446655440009",
+  "eventType": "inventory.low-stock",
+  "occurredAt": "2026-10-18T01:00:00Z",
+  "correlationId": null,
+  "medicineId": "6ad23be6c034632667baaa05",
+  "medicineName": "Augmentin 1g",
+  "availableQuantity": 8,
+  "threshold": 20
+}
+```
+
+#### 3.10. Topic `inventory.near-expiry`
+- **Producer**: `inventory-service` (job định kỳ, `correlationId` = null)
+- **Consumer**: `notification-service`
+```json
+{
+  "eventId": "aaae8400-e29b-41d4-a716-446655440010",
+  "eventType": "inventory.near-expiry",
+  "occurredAt": "2026-10-18T01:00:00Z",
+  "correlationId": null,
+  "medicineId": "6ad23be6c034632667baaa05",
+  "medicineName": "Augmentin 1g",
+  "batchNumber": "LOT2026-09",
+  "expiryDate": "2027-01-15",
+  "quantity": 40,
+  "daysLeft": 83
+}
+```
+
+#### 3.11. Quy tắc xử lý kho
+- `order.created`: giữ hàng theo FEFO trong một transaction; đủ mọi mặt hàng thì phát `inventory.reserved`; thiếu bất kỳ mặt hàng nào thì không giữ gì và phát `inventory.reservation-failed`. Xử lý idempotent theo `orderId`.
+- `order.status-changed`: `newStatus = DA_HUY` thì nhả hàng; `DANG_GIAO` thì chốt trừ kho; `HOAN_TRA` không tự nhập lại kho (ADMIN nhập lại thủ công sau khi kiểm tra thuốc).
+- `order-service` nhận `inventory.reservation-failed` thì chuyển đơn sang `DA_HUY` (lý do nêu thuốc nào hết); nhận `inventory.reserved` thì chỉ ghi lịch sử đơn, không đổi trạng thái.
+- `medicineName` trong event kho do inventory-service lấy qua API batch của medicine-service; nếu không lấy được thì để `null`.
 ---
 
 ## 4. Các Điểm Cần Chốt Quyết Định (Không Tự Đoán)
