@@ -8,7 +8,6 @@ Giai đoạn 2 - Mật khẩu: đổi mật khẩu; quên mật khẩu (sinh tok
 
 Giai đoạn 3 - Đăng nhập QR: web hiển thị QR chứa sessionId (lưu Redis TTL 2 phút, trạng thái PENDING); điện thoại/thiết bị đã đăng nhập quét và xác nhận (PENDING -> CONFIRMED); web nhận kết quả qua WebSocket (quarkus-websockets-next) và được cấp JWT. Vẽ sơ đồ luồng bằng chữ trước khi code.
 
-Giai đoạn 4 - Face Login: auth-service gọi face-recognition-service qua REST Client. Luồng đăng ký khuôn mặt (upload ảnh, lưu vector) và đăng nhập bằng ảnh (so khớp, trả userId nếu độ giống vượt ngưỡng), kèm xử lý lỗi/timeout bằng Fault Tolerance. Nếu face-recognition-service chưa có, viết luôn bản Python FastAPI đơn giản (thư viện face_recognition hoặc DeepFace) với 2 endpoint /register và /verify, có Dockerfile, lưu vector vào MongoDB face_db.
 
 Yêu cầu bảo mật: chống brute force đăng nhập (giới hạn số lần sai, dùng Redis), không log mật khẩu/token, trả thông báo lỗi chung chung khi sai email/mật khẩu.
 Có test cho từng giai đoạn.

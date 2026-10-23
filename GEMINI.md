@@ -31,7 +31,7 @@ Service Quarkus chạy trên máy (./mvnw quarkus:dev), kết nối tới contai
 - inventory-service 8087 (nhóm 2): PostgreSQL inventory_db
 - consultation-service 8088 (nhóm 2): MongoDB consultation_db
 - recommendation-service 8089 (nhóm 2): MongoDB recommendation_db
-- face-recognition-service 8090: Python FastAPI, MongoDB face_db
+
 
 ## Nghiệp vụ cốt lõi
 3 vai trò: KHACH_HANG, DUOC_SI, ADMIN.
