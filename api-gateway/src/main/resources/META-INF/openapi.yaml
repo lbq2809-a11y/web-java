@@ -190,50 +190,6 @@ paths:
         '401':
           description: Chưa đăng nhập trên thiết bị
 
-  /api/v1/auth/face-login:
-    post:
-      tags:
-        - Auth Service (Face Login)
-      summary: Đăng nhập bằng nhận diện khuôn mặt (Public)
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [image]
-              properties:
-                image:
-                  type: string
-                  format: binary
-      responses:
-        '200':
-          description: Nhận diện thành công, trả về JWT access token
-        '401':
-          description: Không khớp khuôn mặt
-
-  /api/v1/auth/face-register:
-    post:
-      tags:
-        - Auth Service (Face Login)
-      summary: Đăng ký dữ liệu khuôn mặt cho tài khoản (Protected - Yêu cầu JWT)
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [image]
-              properties:
-                image:
-                  type: string
-                  format: binary
-      responses:
-        '200':
-          description: Đăng ký khuôn mặt thành công
-
   # ==================== MEDICINE SERVICE ====================
   /api/v1/medicines:
     get:

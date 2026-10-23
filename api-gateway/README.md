@@ -21,7 +21,7 @@ API Gateway là cổng tiếp nhận tập trung (Reverse Proxy) duy nhất publ
 ## 2. Bảng Định Tuyến Dịch Vụ (Routing Table)
 
 | STT | Route Prefix | Backend Service | Cổng Mặc Định | Headers Chuyển Tiếp Đặc Thù |
-| :---: | :--- | :--- | :---: | :--- |
+| :---: | :--- | :--- | :--- | :--- |
 | 1 | `/api/v1/auth/**` | `auth-service` | `8082` | `Authorization`, `X-Correlation-Id` |
 | 2 | `/api/v1/medicines/**`<br>`/api/v1/categories/**` | `medicine-service` | `8081` | `Authorization`, `X-Correlation-Id` |
 | 3 | `/api/v1/prescriptions/**` | `prescription-service` | `8083` | `Authorization`, `X-Correlation-Id`, **Multipart Streaming** |
@@ -41,18 +41,16 @@ Các route sau được Gateway cho phép đi qua tự do mà không yêu cầu 
 3. `POST /api/v1/auth/refresh-token` (Làm mới access token)
 4. `POST /api/v1/auth/forgot-password` (Yêu cầu mã đặt lại mật khẩu)
 5. `POST /api/v1/auth/reset-password` (Đặt lại mật khẩu)
-6. `POST /api/v1/auth/face-login` (Đăng nhập bằng nhận diện khuôn mặt)
-7. `POST /api/v1/auth/qr/session` (Tạo phiên đăng nhập QR mới)
-8. `GET /api/v1/auth/qr/session/{sessionId}` (Kiểm tra trạng thái phiên QR)
-9. `GET /api/v1/medicines/**` & `GET /api/v1/categories/**` (Tra cứu danh mục và thông tin thuốc)
-10. `GET /api/v1/payments/vnpay/**` & `POST /api/v1/payments/vnpay/**` (VNPay IPN webhook & Return URL đối soát)
-11. `GET /q/**` (Quarkus Health Check `/q/health`, OpenAPI `/q/openapi`, Swagger UI)
-12. `OPTIONS *` (CORS Preflight requests)
+6. `POST /api/v1/auth/qr/session` (Tạo phiên đăng nhập QR mới)
+7. `GET /api/v1/auth/qr/session/{sessionId}` (Kiểm tra trạng thái phiên QR)
+8. `GET /api/v1/medicines/**` & `GET /api/v1/categories/**` (Tra cứu danh mục và thông tin thuốc)
+9. `GET /api/v1/payments/vnpay/**` & `POST /api/v1/payments/vnpay/**` (VNPay IPN webhook & Return URL đối soát)
+10. `GET /q/**` (Quarkus Health Check `/q/health`, OpenAPI `/q/openapi`, Swagger UI)
+11. `OPTIONS *` (CORS Preflight requests)
 
 > [!IMPORTANT]
-> **Quy định bảo mật QR & Face**:
+> **Quy định bảo mật QR**:
 > - API quét xác nhận QR từ thiết bị di động (`POST /api/v1/auth/qr/confirm`) **BẮT BUỘC phải có JWT hợp lệ**.
-> - API đăng ký khuôn mặt (`POST /api/v1/auth/face-register`) **BẮT BUỘC phải có JWT hợp lệ**.
 
 ---
 
