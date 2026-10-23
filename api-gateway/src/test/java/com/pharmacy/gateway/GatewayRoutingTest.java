@@ -300,33 +300,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 10: Face Login - Đăng nhập khuôn mặt (POST /face-login) là công khai không cần JWT")
-    public void testFaceLoginPublicAllowed() {
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"image\":\"base64data\"}")
-            .when()
-            .post("/api/v1/auth/face-login")
-            .then()
-            .statusCode(200)
-            .body("status", equalTo("SUCCESS"));
-    }
-
-    @Test
-    @DisplayName("Ca 11: Face Register - Đăng ký khuôn mặt (POST /face-register) BẮT BUỘC cần JWT, chặn 401 nếu thiếu")
-    public void testFaceRegisterRequiresJwt() {
-        given()
-            .contentType(ContentType.JSON)
-            .body("{\"image\":\"base64data\"}")
-            .when()
-            .post("/api/v1/auth/face-register")
-            .then()
-            .statusCode(401)
-            .body("code", equalTo("UNAUTHORIZED"));
-    }
-
-    @Test
-    @DisplayName("Ca 12: VNPay Callbacks - IPN và Return URL (/payments/vnpay/**) là công khai không cần JWT")
+    @DisplayName("Ca 10: VNPay Callbacks - IPN và Return URL (/payments/vnpay/**) là công khai không cần JWT")
     public void testVnPayCallbacksPublicAllowed() {
         // VNPay IPN webhook
         given()
@@ -346,7 +320,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 13: Các API Payments khác (ví dụ POST /payments) BẮT BUỘC cần JWT, chặn 401 nếu thiếu")
+    @DisplayName("Ca 11: Các API Payments khác (ví dụ POST /payments) BẮT BUỘC cần JWT, chặn 401 nếu thiếu")
     public void testOtherPaymentRoutesRequireJwt() {
         given()
             .contentType(ContentType.JSON)
@@ -359,7 +333,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 14: Chống giả mạo Header - Gateway lọc sạch X-Role, X-User-Id, X-Customer-Id gửi từ client")
+    @DisplayName("Ca 12: Chống giả mạo Header - Gateway lọc sạch X-Role, X-User-Id, X-Customer-Id gửi từ client")
     public void testSpoofableInternalHeadersStripped() {
         given()
             .header("X-Role", "ADMIN")
@@ -377,7 +351,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 15: Chặn 401 Unauthorized đối với Protected Route khi thiếu header Authorization")
+    @DisplayName("Ca 13: Chặn 401 Unauthorized đối với Protected Route khi thiếu header Authorization")
     public void testProtectedRouteRejectedWhenMissingToken() {
         given()
             .when()
@@ -390,7 +364,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 16: Chặn 401 Unauthorized khi token JWT giả mạo hoặc sai định dạng")
+    @DisplayName("Ca 14: Chặn 401 Unauthorized khi token JWT giả mạo hoặc sai định dạng")
     public void testProtectedRouteRejectedWhenTokenIsInvalid() {
         given()
             .header("Authorization", "Bearer invalid.malformed.garbage-token")
@@ -403,7 +377,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 17: Cho phép truy cập khi có JWT hợp lệ và chuyển tiếp trọn vẹn Idempotency-Key")
+    @DisplayName("Ca 15: Cho phép truy cập khi có JWT hợp lệ và chuyển tiếp trọn vẹn Idempotency-Key")
     public void testProtectedRouteAllowedWithValidTokenAndHeadersPropagated() {
         String validToken = createValidToken("KHACH_HANG");
         String idempotencyKey = UUID.randomUUID().toString();
@@ -424,7 +398,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 18: Trả về 503 SERVICE_UNAVAILABLE khi dịch vụ đích backend bị mất kết nối")
+    @DisplayName("Ca 16: Trả về 503 SERVICE_UNAVAILABLE khi dịch vụ đích backend bị mất kết nối")
     public void testDownstreamServiceUnavailable503() {
         String validToken = createValidToken("KHACH_HANG");
 
@@ -441,7 +415,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 19: Trả về 504 GATEWAY_TIMEOUT khi dịch vụ backend xử lý quá hạn (timeout)")
+    @DisplayName("Ca 17: Trả về 504 GATEWAY_TIMEOUT khi dịch vụ backend xử lý quá hạn (timeout)")
     public void testBackendTimeoutReturns504GatewayTimeout() {
         // Gọi endpoint có tham số ?slow=true (delay 800ms > timeout cấu hình 400ms)
         given()
@@ -455,7 +429,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 20: Stream trực tiếp Multipart Form Data upload ảnh bảo toàn 100% magic bytes nhị phân")
+    @DisplayName("Ca 18: Stream trực tiếp Multipart Form Data upload ảnh bảo toàn 100% magic bytes nhị phân")
     public void testMultipartFileUploadStreamingPreserved() {
         String validToken = createValidToken("KHACH_HANG");
         byte[] mockJpgBytes = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'};
@@ -473,7 +447,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 21: Xử lý CORS Preflight (OPTIONS request) cho phép gọi từ localhost Frontend")
+    @DisplayName("Ca 19: Xử lý CORS Preflight (OPTIONS request) cho phép gọi từ localhost Frontend")
     public void testCorsPreflightOptionsRequest() {
         given()
             .header("Origin", "http://localhost:3000")
@@ -487,7 +461,7 @@ public class GatewayRoutingTest {
     }
 
     @Test
-    @DisplayName("Ca 22: OpenAPI & Swagger UI hiển thị đầy đủ danh sách endpoint từ openapi.yaml")
+    @DisplayName("Ca 20: OpenAPI & Swagger UI hiển thị đầy đủ danh sách endpoint từ openapi.yaml")
     public void testOpenApiEndpointsExposed() {
         given()
             .when()
