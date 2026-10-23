@@ -1,0 +1,587 @@
+openapi: 3.0.3
+info:
+  title: API Gateway - Nhà Thuốc Trực Tuyến
+  description: Cổng tiếp nhận tập trung (Reverse Proxy) phân phối yêu cầu cho toàn bộ hệ sinh thái Pharmacy Microservices
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Cổng API Gateway chính thức
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Nhập JWT access token (không cần gõ chữ Bearer)
+paths:
+  # ==================== AUTH SERVICE ====================
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth Service
+      summary: Đăng nhập hệ thống (Public)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: khachhang@gmail.com
+                password:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: Đăng nhập thành công, trả về JWT access token
+        '401':
+          description: Sai email hoặc mật khẩu
+
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Auth Service
+      summary: Đăng ký tài khoản khách hàng mới (Public)
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName, phone]
+              properties:
+                email:
+                  type: string
+                  example: nguyenvanan@gmail.com
+                password:
+                  type: string
+                  example: "123456"
+                fullName:
+                  type: string
+                  example: Nguyễn Văn An
+                phone:
+                  type: string
+                  example: "0901234567"
+      responses:
+        '201':
+          description: Đăng ký thành công
+
+  /api/v1/auth/refresh-token:
+    post:
+      tags:
+        - Auth Service
+      summary: Làm mới access token bằng refresh token (Public)
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Cấp access token mới thành công
+
+  /api/v1/auth/me:
+    get:
+      tags:
+        - Auth Service
+      summary: Xem thông tin tài khoản hiện tại (Protected)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Thông tin người dùng đăng nhập
+
+  /api/v1/auth/forgot-password:
+    post:
+      tags:
+        - Auth Service
+      summary: Yêu cầu đặt lại mật khẩu qua email (Public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  example: khachhang@gmail.com
+      responses:
+        '200':
+          description: Đã gửi mã xác nhận
+
+  /api/v1/auth/reset-password:
+    post:
+      tags:
+        - Auth Service
+      summary: Đặt lại mật khẩu mới bằng token (Public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+      responses:
+        '200':
+          description: Đổi mật khẩu thành công
+
+  /api/v1/auth/qr/session:
+    post:
+      tags:
+        - Auth Service (QR Login)
+      summary: Khởi tạo phiên đăng nhập bằng mã QR (Public)
+      responses:
+        '200':
+          description: Tạo phiên thành công, trả về sessionId và chuỗi QR
+
+  /api/v1/auth/qr/session/{sessionId}:
+    get:
+      tags:
+        - Auth Service (QR Login)
+      summary: Kiểm tra trạng thái phiên đăng nhập QR (Public)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trạng thái phiên (PENDING, CONFIRMED, EXPIRED)
+
+  /api/v1/auth/qr/confirm:
+    post:
+      tags:
+        - Auth Service (QR Login)
+      summary: Thiết bị di động xác nhận đăng nhập QR (Protected - Yêu cầu JWT)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId]
+              properties:
+                sessionId:
+                  type: string
+      responses:
+        '200':
+          description: Xác nhận đăng nhập thành công
+        '401':
+          description: Chưa đăng nhập trên thiết bị
+
+  /api/v1/auth/face-login:
+    post:
+      tags:
+        - Auth Service (Face Login)
+      summary: Đăng nhập bằng nhận diện khuôn mặt (Public)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Nhận diện thành công, trả về JWT access token
+        '401':
+          description: Không khớp khuôn mặt
+
+  /api/v1/auth/face-register:
+    post:
+      tags:
+        - Auth Service (Face Login)
+      summary: Đăng ký dữ liệu khuôn mặt cho tài khoản (Protected - Yêu cầu JWT)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Đăng ký khuôn mặt thành công
+
+  # ==================== MEDICINE SERVICE ====================
+  /api/v1/medicines:
+    get:
+      tags:
+        - Medicine Service
+      summary: Tra cứu danh sách thuốc (Public)
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: keyword
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Danh sách thuốc phân trang
+
+  /api/v1/medicines/{id}:
+    get:
+      tags:
+        - Medicine Service
+      summary: Xem chi tiết một loại thuốc theo ID (Public)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 6ad23be6c034632667baaa05
+      responses:
+        '200':
+          description: Chi tiết thuốc
+        '404':
+          description: Không tìm thấy thuốc
+
+  /api/v1/medicines/batch:
+    get:
+      tags:
+        - Medicine Service
+      summary: Lấy thông tin nhiều thuốc theo danh sách ID (Batch)
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: string
+            example: 6ad23be6c034632667baaa05,6ad23be6c034632667baaa06
+      responses:
+        '200':
+          description: Danh sách thông tin chi tiết các thuốc
+
+  /api/v1/categories:
+    get:
+      tags:
+        - Medicine Service
+      summary: Xem danh mục thuốc (Public)
+      responses:
+        '200':
+          description: Danh sách các danh mục thuốc
+
+  # ==================== PRESCRIPTION SERVICE ====================
+  /api/v1/prescriptions:
+    post:
+      tags:
+        - Prescription Service
+      summary: Tải lên đơn thuốc có đính kèm ảnh (Protected - Multipart Streaming)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Tệp ảnh đơn thuốc (JPG hoặc PNG, tối đa 5MB)
+                diagnosis:
+                  type: string
+                  example: Viêm họng cấp
+                note:
+                  type: string
+                  example: Đơn thuốc khám tại Bệnh viện Bạch Mai
+      responses:
+        '201':
+          description: Tải lên đơn thuốc thành công, chuyển sang trạng thái CHO_DUYET
+        '400':
+          description: File ảnh không đúng định dạng JPG/PNG
+
+    get:
+      tags:
+        - Prescription Service
+      summary: Lấy danh sách đơn thuốc của người dùng (Protected)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sách đơn thuốc
+
+  /api/v1/prescriptions/{id}:
+    get:
+      tags:
+        - Prescription Service
+      summary: Xem chi tiết đơn thuốc theo ID (Protected)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chi tiết đơn thuốc
+
+  # ==================== ORDER SERVICE (CART & ORDERS) ====================
+  /api/v1/cart:
+    get:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Xem giỏ hàng của người dùng trên Redis (Protected)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sách thuốc trong giỏ hàng kèm snapshot giá và tổng tiền
+
+  /api/v1/cart/items:
+    post:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Thêm thuốc vào giỏ hàng (Protected)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [medicineId, quantity]
+              properties:
+                medicineId:
+                  type: string
+                  example: 6ad23be6c034632667baaa05
+                quantity:
+                  type: integer
+                  example: 2
+      responses:
+        '200':
+          description: Thêm vào giỏ thành công
+
+  /api/v1/cart/items/{medicineId}:
+    put:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Cập nhật số lượng thuốc trong giỏ hàng (Protected)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: medicineId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  example: 5
+      responses:
+        '200':
+          description: Cập nhật thành công
+
+    delete:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Xóa thuốc khỏi giỏ hàng (Protected)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: medicineId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Xóa khỏi giỏ thành công
+
+  /api/v1/orders:
+    post:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Đặt hàng / Checkout (Protected - Yêu cầu Idempotency-Key)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: UUID sinh bởi Client chống đặt trùng đơn khi mạng chập chờn
+          schema:
+            type: string
+            format: uuid
+            example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shippingAddress, paymentMethod]
+              properties:
+                prescriptionId:
+                  type: string
+                  format: uuid
+                  description: Bắt buộc nếu trong giỏ có thuốc kê đơn (ETC)
+                paymentMethod:
+                  type: string
+                  enum: [COD, VNPAY, MOMO, QR]
+                  example: COD
+                note:
+                  type: string
+                  example: Giao giờ hành chính
+                shippingAddress:
+                  type: object
+                  required: [receiverName, receiverPhone, streetAddress, ward, district, city]
+                  properties:
+                    receiverName:
+                      type: string
+                      example: Nguyễn Văn An
+                    receiverPhone:
+                      type: string
+                      example: "0901234567"
+                    streetAddress:
+                      type: string
+                      example: 123 Đường Giải Phóng
+                    ward:
+                      type: string
+                      example: Phương Mai
+                    district:
+                      type: string
+                      example: Đống Đa
+                    city:
+                      type: string
+                      example: Hà Nội
+      responses:
+        '201':
+          description: Đặt đơn hàng thành công, trạng thái ban đầu CHO_XU_LY
+        '400':
+          description: Thiếu đơn thuốc hợp lệ cho thuốc ETC hoặc Idempotency-Key bị trùng lặp
+
+    get:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Tra cứu danh sách đơn hàng của người dùng (Protected)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Danh sách đơn hàng
+
+  /api/v1/orders/{id}:
+    get:
+      tags:
+        - Order Service (Cart & Orders)
+      summary: Xem chi tiết một đơn hàng kèm snapshot thuốc (Protected)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chi tiết đơn hàng
+
+  # ==================== PAYMENT SERVICE ====================
+  /api/v1/payments:
+    post:
+      tags:
+        - Payment Service
+      summary: Khởi tạo giao dịch thanh toán (Protected)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, paymentMethod]
+              properties:
+                orderId:
+                  type: string
+                  format: uuid
+                paymentMethod:
+                  type: string
+                  enum: [COD, VNPAY, MOMO, QR]
+      responses:
+        '201':
+          description: Tạo giao dịch thanh toán thành công
+
+  /api/v1/payments/vnpay/ipn:
+    get:
+      tags:
+        - Payment Service (VNPay)
+      summary: Webhook IPN nhận kết quả thanh toán từ máy chủ VNPay (Public)
+      responses:
+        '200':
+          description: Phản hồi RspCode cho VNPay Server
+    post:
+      tags:
+        - Payment Service (VNPay)
+      summary: Webhook IPN nhận kết quả thanh toán dạng POST từ VNPay (Public)
+      responses:
+        '200':
+          description: Phản hồi RspCode cho VNPay Server
+
+  /api/v1/payments/vnpay/return:
+    get:
+      tags:
+        - Payment Service (VNPay)
+      summary: Trình duyệt người dùng chuyển hướng về sau khi thanh toán trên VNPay (Public)
+      responses:
+        '200':
+          description: Trang thông báo kết quả thanh toán cho khách hàng
+
