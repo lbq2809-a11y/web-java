@@ -20,7 +20,6 @@ Mỗi service sở hữu một cơ sở dữ liệu riêng biệt (Database-per-
 | 8 | `inventory-service` | `8087` | **PostgreSQL**: `inventory_db` | `inventory_user` / `inventory_pass` — Quản lý tồn kho (Nhóm 2) |
 | 9 | `consultation-service` | `8088` | **MongoDB**: `consultation_db` | Tư vấn trực tuyến khách hàng - dược sĩ qua WebSocket (Nhóm 2) |
 | 10 | `recommendation-service` | `8089` | **MongoDB**: `recommendation_db` | Gợi ý thuốc liên quan dựa trên lịch sử/sự kiện đơn hàng (Nhóm 2) |
-| 11 | `face-recognition-service` | `8090` | **MongoDB**: `face_db` | Python FastAPI — Đăng ký và xác thực khuôn mặt |
 
 ---
 
