@@ -1,0 +1,33 @@
+{
+  "THANH_PHAN": [
+    "thành phần", "thanh phan", "hoạt chất", "hoat chat",
+    "chứa chất gì", "chua chat gi", "hàm lượng", "ham luong", "gồm chất gì", "gom chat gi"
+  ],
+  "CHI_DINH": [
+    "công dụng", "cong dung", "dùng để làm gì", "dung de lam gi",
+    "trị bệnh gì", "tri benh gi", "chữa bệnh gì", "chua benh gi",
+    "chỉ định", "chi dinh", "tác dụng gì", "tac dung gi", "điều trị gì", "dieu tri gi"
+  ],
+  "CHONG_CHI_DINH": [
+    "ai không nên dùng", "ai khong nen dung", "chống chỉ định", "chong chi dinh",
+    "kiêng", "kieng", "lưu ý", "luu y", "tác dụng phụ", "tac dung phu",
+    "dị ứng", "di ung", "cảnh báo", "canh bao", "không được dùng", "khong duoc dung"
+  ],
+  "CACH_DUNG": [
+    "uống thế nào", "uong the nao", "uống như thế nào", "uong nhu the nao",
+    "cách dùng", "cach dung", "dùng như thế nào", "dung nhu the nao",
+    "liều dùng", "lieu dung", "ngày mấy viên", "ngay may vien",
+    "uống mấy viên", "uong may vien", "uống trước hay sau ăn", "uong truoc hay sau an",
+    "hướng dẫn sử dụng", "huong dan su dung", "uống sao", "uong sao", "dùng sao", "dung sao"
+  ],
+  "LOAI_THUOC": [
+    "kê đơn hay không", "ke don hay khong", "thuốc kê đơn không", "thuoc ke don khong",
+    "cần đơn không", "can don khong", "cần đơn thuốc không", "can don thuoc khong",
+    "loại thuốc", "loai thuoc", "etc hay otc", "otc hay etc"
+  ],
+  "GIA": [
+    "bao nhiêu tiền", "bao nhieu tien", "giá bao nhiêu", "gia bao nhieu",
+    "giá", "gia", "bán giá", "ban gia", "bao nhiêu một hộp", "bao nhieu mot hop",
+    "bao nhiêu 1 hộp", "bao nhieu 1 hop", "chi phí", "chi phi"
+  ]
+}

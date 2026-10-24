@@ -1,0 +1,14 @@
+{
+  "THANH_PHAN": "Thuốc {name} có thành phần và hoạt chất chính là: {activeIngredient}.",
+  "CHI_DINH": "Thuốc {name} có công dụng và chỉ định: {indications}.",
+  "CHONG_CHI_DINH": "Chống chỉ định và lưu ý khi dùng thuốc {name}: {contraindications}.",
+  "CACH_DUNG": "Cách dùng và liều lượng khuyến cáo cho thuốc {name}: {dosage}.",
+  "LOAI_THUOC": "Thuốc {name} thuộc phân loại {prescriptionTypeDescription}.",
+  "GIA": "Thuốc {name} hiện có giá bán tham khảo là {price} VNĐ / {unit}.",
+  "EMERGENCY": "Trường hợp khẩn cấp hoặc có dấu hiệu nguy kịch, vui lòng gọi cấp cứu 115 hoặc đến ngay cơ sở y tế gần nhất để được hỗ trợ y tế kịp thời!",
+  "VULNERABLE": "Đối tượng phụ nữ có thai, đang cho con bú hoặc trẻ nhỏ/trẻ sơ sinh rất nhạy cảm với dược chất. Vui lòng tham khảo ý kiến trực tiếp của bác sĩ chuyên khoa trước khi sử dụng.",
+  "UNKNOWN": "Hiện tại trợ lý AI chưa có đủ thông tin chi tiết về thuốc hoặc câu hỏi này. Bạn vui lòng liên hệ trực tiếp với dược sĩ chuyên môn để được tư vấn cụ thể và an toàn nhất.",
+  "DISCLAIMER": "Thông tin tư vấn từ trợ lý AI chỉ mang tính chất tham khảo, không thay thế cho chẩn đoán, chỉ định hay tư vấn của bác sĩ và chuyên gia y tế.",
+  "ETC_WARNING": "\n\n⚠️ Lưu ý quan trọng: Đây là thuốc kê đơn (ETC), bắt buộc phải có chỉ định và đơn thuốc của bác sĩ."
+}
+
