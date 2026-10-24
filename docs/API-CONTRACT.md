@@ -330,6 +330,66 @@ Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`, `503`)
 
 ---
 
+### 2.5. `recommendation-service` (`http://localhost:8089`)
+*(Thiết kế theo `docs/B10-recommendation-service.md`, sử dụng MongoDB `recommendation_db` để gợi ý thuốc theo thống kê mua hàng và an toàn dược phẩm)*
+
+#### (A) Gợi ý thuốc thường được mua kèm (Frequently Bought Together)
+- **Path**: `GET /api/v1/recommendations/also-bought/{medicineId}?limit=5`
+- **Quyền truy cập**: Public (không yêu cầu JWT).
+- **Query Parameter**: `limit` (mặc định: `5`, min: `1`, max: `20`).
+- **Nghiệp vụ**:
+  - Truy vấn ma trận đồng xuất hiện (`product_cooccurrence`), sắp xếp theo tần suất mua kèm giảm dần (`count DESC`), tie-break theo `coMedicineId ASC`.
+  - Tra cứu chi tiết thuốc qua `medicine-service` (`GET /api/v1/medicines/batch?ids=...`).
+  - Lọc bỏ thuốc ngừng bán (`active = false`). Thuốc kê đơn (`ETC`) vẫn được phép hiển thị với `requiresPrescription = true`.
+- **Response thành công (`200 OK`)**:
+  ```json
+  [
+    {
+      "medicineId": "6ad23be6c034632667baaa02",
+      "name": "Panadol Extra Đỏ",
+      "price": 55000.00,
+      "type": "OTC",
+      "requiresPrescription": false,
+      "reason": "FREQUENTLY_BOUGHT_TOGETHER"
+    }
+  ]
+  ```
+
+#### (B) Gợi ý cá nhân hóa cho người dùng (Personalized For Me)
+- **Path**: `GET /api/v1/recommendations/for-me?limit=5`
+- **Quyền truy cập**: Yêu cầu JWT (`KHACH_HANG`, `DUOC_SI`, `ADMIN`). Lấy `userId` từ claim `sub`.
+- **Query Parameter**: `limit` (mặc định: `5`, min: `1`, max: `20`).
+- **Nghiệp vụ & An toàn Dược phẩm**:
+  - Lấy các thuốc khách đã từng mua từ `user_purchase_history`.
+  - Tìm các thuốc hay mua kèm trong `product_cooccurrence`, loại bỏ các thuốc khách đã từng mua.
+  - **AN TOÀN TUYỆT ĐỐI**: **Không bao giờ gợi ý thuốc kê đơn (`ETC`)**; chỉ giữ lại thuốc `OTC` và `active = true`.
+  - **Fallback**: Nếu người dùng mới chưa từng mua hàng hoặc danh sách lọc bị rỗng, tự động chuyển sang Top thuốc bán chạy nhất từ `product_stats` (cũng loại bỏ `ETC`, chỉ lấy `OTC` active).
+  - Thuộc tính `reason`: `"FOR_YOU"` (nếu từ gợi ý cá nhân hóa) hoặc `"BEST_SELLER"` (nếu fallback sang bán chạy).
+- **Response thành công (`200 OK`)**:
+  ```json
+  [
+    {
+      "medicineId": "6ad23be6c034632667baaa03",
+      "name": "Vitamin C 500mg Boston",
+      "price": 45000.00,
+      "type": "OTC",
+      "requiresPrescription": false,
+      "reason": "FOR_YOU"
+    }
+  ]
+  ```
+
+#### (C) Gợi ý thuốc cùng danh mục (Related by Category)
+- **Path**: `GET /api/v1/recommendations/related/{medicineId}?limit=5`
+- **Quyền truy cập**: Public (không yêu cầu JWT).
+- **Query Parameter**: `limit` (mặc định: `5`, min: `1`, max: `20`).
+- **Nghiệp vụ**:
+  - Tra cứu `categoryId` của thuốc từ `medicine-service` (`GET /api/v1/medicines/{medicineId}`).
+  - Lấy các thuốc cùng danh mục từ `medicine-service` (`GET /api/v1/medicines?categoryId={categoryId}`), loại trừ chính `medicineId`.
+  - Giữ cả OTC và ETC (ETC có `requiresPrescription = true`), chỉ lấy thuốc active. Thuộc tính `reason`: `"SAME_CATEGORY"`.
+
+---
+
 ## 3. Hợp Đồng Sự Kiện Apache Kafka (`localhost:9092`)
 
 - **Broker**: `localhost:9092`
@@ -343,7 +403,7 @@ Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`, `503`)
 | STT | Tên Topic | Service Phát (Producer) | Service Nhận (Consumer) | Mục đích nghiệp vụ |
 | :---: | :--- | :--- | :--- | :--- |
 | 1 | `order.created` | `order-service` | `notification-service`, `recommendation-service`, `inventory-service` | Thông báo đặt hàng thành công, cập nhật gợi ý thuốc mua kèm, trừ tồn kho. |
-| 2 | `order.status-changed` | `order-service` | `notification-service` | Gửi thông báo/email cho khách khi đơn chuyển sang `DANG_GIAO`, `HOAN_THANH`, `DA_HUY`, `HOAN_TRA`. |
+| 2 | `order.status-changed` | `order-service` | `notification-service`, `recommendation-service` | Gửi thông báo/email cho khách; recommendation-service cập nhật co-occurrence và stats khi đơn HOAN_THANH, xóa đơn tạm khi DA_HUY. |
 | 3 | `payment.completed` | `payment-service` *(Outbox)* | `order-service`, `notification-service` | Cập nhật trạng thái thanh toán của đơn hàng và gửi biên lai email cho khách. |
 | 4 | `payment.failed` | `payment-service` *(Outbox)* | `order-service`, `notification-service` | Ghi nhận thanh toán thất bại để khách thanh toán lại hoặc hủy đơn. |
 | 5 | `prescription.reviewed` | `prescription-service` | `notification-service` | Thông báo cho khách biết đơn thuốc đã được dược sĩ duyệt (`DA_DUYET`) hay từ chối (`TU_CHOI`). |
