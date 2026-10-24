@@ -1,10 +1,12 @@
 package com.pharmacy.consultation.service;
 
+import com.pharmacy.consultation.client.EmbeddingClient;
 import com.pharmacy.consultation.client.MedicineServiceClient;
 import com.pharmacy.consultation.dto.MedicineResponse;
 import com.pharmacy.consultation.dto.PagedResponse;
 import com.pharmacy.consultation.entity.KnowledgeChunkDocument;
 import com.pharmacy.consultation.repository.KnowledgeChunkRepository;
+import com.pharmacy.consultation.repository.RagCacheRepository;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -20,8 +22,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Nạp tri thức thuốc từ medicine-service vào MongoDB (collection knowledge_chunks)
- * và nạp vào bộ nhớ RAM (MedicineKnowledgeCache).
+ * Nạp tri thức thuốc từ medicine-service vào MongoDB (collection knowledge_chunks),
+ * tạo vector nhúng (Embedding), lưu vào RAM (MedicineKnowledgeCache & VectorKnowledgeStore)
+ * và quản lý vô hiệu hóa cache RAG.
  */
 @ApplicationScoped
 public class KnowledgeIngestionService {
@@ -38,6 +41,15 @@ public class KnowledgeIngestionService {
 
     @Inject
     MedicineKnowledgeCache medicineCache;
+
+    @Inject
+    VectorKnowledgeStore vectorStore;
+
+    @Inject
+    EmbeddingClient embeddingClient;
+
+    @Inject
+    RagCacheRepository ragCacheRepository;
 
     @Inject
     TextNormalizer textNormalizer;
@@ -71,7 +83,6 @@ public class KnowledgeIngestionService {
             } catch (Exception e) {
                 LOG.errorf("Lỗi khi gọi API medicine-service tại trang %d: %s", page, e.getMessage());
                 if (page == 0) {
-                    // Nếu trang 0 đã lỗi thì dừng lại
                     break;
                 }
                 break;
@@ -124,6 +135,18 @@ public class KnowledgeIngestionService {
         }
 
         medicineCache.update(cachedList);
+
+        // 3. Tính toán và cập nhật Vector Embeddings cho các chunk
+        generateAndPersistEmbeddings();
+
+        // 4. Xóa toàn bộ RAG cache câu trả lời khi reindex (theo yêu cầu mục C.4)
+        try {
+            long deletedCache = ragCacheRepository.deleteAll();
+            LOG.infof("Đã xóa %d bản ghi cache RAG cũ sau khi reindex.", deletedCache);
+        } catch (Exception e) {
+            LOG.warnf("Không thể xóa RAG cache: %s", e.getMessage());
+        }
+
         LOG.infof("Đồng bộ hoàn tất: %d thuốc, %d chunks tri thức.", totalMedicines, totalChunks);
         return new ReindexResult(totalMedicines, totalChunks);
     }
@@ -142,8 +165,12 @@ public class KnowledgeIngestionService {
             if (!hash.equals(existing.contentHash)) {
                 existing.text = text;
                 existing.contentHash = hash;
+                existing.embedding = null; // Cần tính lại vector nhúng vì nội dung đã đổi
                 existing.updatedAt = now;
                 chunkRepository.update(existing);
+
+                // Xóa cache RAG liên quan đến thuốc này
+                ragCacheRepository.deleteByMedicineId(medicineId);
             }
         } else {
             KnowledgeChunkDocument newChunk = new KnowledgeChunkDocument(
@@ -152,6 +179,57 @@ public class KnowledgeIngestionService {
             chunkRepository.persist(newChunk);
         }
         return 1;
+    }
+
+    private void generateAndPersistEmbeddings() {
+        try {
+            List<KnowledgeChunkDocument> allChunks = chunkRepository.listAll();
+            List<KnowledgeChunkDocument> chunksNeedingEmbedding = new ArrayList<>();
+
+            for (KnowledgeChunkDocument c : allChunks) {
+                if (c.embedding == null || c.embedding.isEmpty()) {
+                    chunksNeedingEmbedding.add(c);
+                }
+            }
+
+            if (!chunksNeedingEmbedding.isEmpty()) {
+                LOG.infof("Đang sinh vector embedding cho %d chunks...", chunksNeedingEmbedding.size());
+                List<String> texts = chunksNeedingEmbedding.stream()
+                        .map(c -> String.format("%s - %s: %s", c.medicineName, c.section, c.text))
+                        .toList();
+
+                List<List<Double>> vectors = embeddingClient.embedBatch(texts);
+                if (vectors != null && vectors.size() == chunksNeedingEmbedding.size()) {
+                    for (int i = 0; i < chunksNeedingEmbedding.size(); i++) {
+                        KnowledgeChunkDocument doc = chunksNeedingEmbedding.get(i);
+                        doc.embedding = vectors.get(i);
+                        doc.updatedAt = Instant.now();
+                        chunkRepository.update(doc);
+                    }
+                }
+            }
+
+            // Nạp lại toàn bộ vector vào RAM cho VectorKnowledgeStore
+            List<KnowledgeChunkDocument> updatedChunks = chunkRepository.listAll();
+            List<VectorItem> ramVectors = new ArrayList<>();
+            for (KnowledgeChunkDocument c : updatedChunks) {
+                if (c.embedding != null && !c.embedding.isEmpty()) {
+                    ramVectors.add(new VectorItem(
+                            c.id != null ? c.id.toHexString() : null,
+                            c.medicineId,
+                            c.medicineName,
+                            c.section,
+                            c.text,
+                            c.embedding,
+                            c.contentHash
+                    ));
+                }
+            }
+            vectorStore.updateVectors(ramVectors);
+
+        } catch (Exception e) {
+            LOG.warnf("Chưa thể sinh vector embedding lúc này (dịch vụ AI chưa sẵn sàng): %s", e.getMessage());
+        }
     }
 
     private String computeSha256(String input) {
@@ -171,4 +249,3 @@ public class KnowledgeIngestionService {
         }
     }
 }
-

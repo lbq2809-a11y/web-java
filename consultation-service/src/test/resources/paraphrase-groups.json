@@ -1,0 +1,103 @@
+[
+  {
+    "groupId": "group-01",
+    "topic": "Đau đầu / Hạ sốt",
+    "expectedMedicineId": "6ad23be6c034632667baaa02",
+    "questions": [
+      "Bị đau đầu nên uống thuốc gì để giảm đau nhanh?",
+      "Thuốc hạ sốt và giảm nhức đầu hiệu quả?",
+      "Triệu chứng đau đầu sốt nhẹ nên dùng thuốc nào?"
+    ]
+  },
+  {
+    "groupId": "group-02",
+    "topic": "Kháng sinh nhiễm trùng hô hấp",
+    "expectedMedicineId": "6ad23be6c034632667baaa01",
+    "questions": [
+      "Bị viêm họng và nhiễm khuẩn đường hô hấp uống thuốc gì?",
+      "Kháng sinh điều trị nhiễm trùng tai mũi họng?",
+      "Thuốc trị viêm đường hô hấp do vi khuẩn?"
+    ]
+  },
+  {
+    "groupId": "group-03",
+    "topic": "Thuốc sủi hạ sốt Efferalgan",
+    "expectedMedicineId": "6ad23be6c034632667baaa03",
+    "questions": [
+      "Efferalgan 500mg dạng sủi hòa tan thế nào?",
+      "Cách uống thuốc sủi Efferalgan hạ sốt?",
+      "Hướng dẫn pha viên sủi Efferalgan 500mg?"
+    ]
+  },
+  {
+    "groupId": "group-04",
+    "topic": "Thuốc kê đơn Augmentin",
+    "expectedMedicineId": "6ad23be6c034632667baaa01",
+    "questions": [
+      "Thuốc Augmentin 1g có bắt buộc cần đơn bác sĩ không?",
+      "Mua Augmentin 1g có cần toa thuốc không?",
+      "Augmentin là thuốc ETC hay OTC?"
+    ]
+  },
+  {
+    "groupId": "group-05",
+    "topic": "Giá bán Panadol Extra",
+    "expectedMedicineId": "6ad23be6c034632667baaa02",
+    "questions": [
+      "Panadol Extra bán giá bao nhiêu một hộp?",
+      "Một hộp Panadol Extra bao nhiêu tiền?",
+      "Chi phí mua thuốc Panadol Extra là bao nhiêu?"
+    ]
+  },
+  {
+    "groupId": "group-06",
+    "topic": "Chống chỉ định gan",
+    "expectedMedicineId": "6ad23be6c034632667baaa02",
+    "questions": [
+      "Người suy gan nặng có uống được Panadol Extra không?",
+      "Bệnh gan có dùng được thuốc Panadol Extra không?",
+      "Lưu ý cho bệnh nhân suy gan khi dùng Panadol Extra?"
+    ]
+  },
+  {
+    "groupId": "group-07",
+    "topic": "Thời điểm uống Augmentin",
+    "expectedMedicineId": "6ad23be6c034632667baaa01",
+    "questions": [
+      "Augmentin 1g uống trước hay sau khi ăn?",
+      "Nên uống Augmentin 1g vào lúc nào sau bữa ăn?",
+      "Thuốc Augmentin 1g uống cách bữa ăn bao lâu?"
+    ]
+  },
+  {
+    "groupId": "group-08",
+    "topic": "Dị ứng Penicillin",
+    "expectedMedicineId": "6ad23be6c034632667baaa01",
+    "questions": [
+      "Dị ứng với Penicillin có được uống Augmentin 1g không?",
+      "Mẫn cảm beta-lactam có dùng Augmentin 1g được không?",
+      "Ai không nên dùng Augmentin 1g vì tiền sử dị ứng?"
+    ]
+  },
+  {
+    "groupId": "group-09",
+    "topic": "Liều dùng Panadol người lớn",
+    "expectedMedicineId": "6ad23be6c034632667baaa02",
+    "questions": [
+      "Người lớn uống Panadol Extra mấy viên một ngày?",
+      "Liều lượng uống Panadol Extra cho người lớn?",
+      "Mỗi lần uống bao nhiêu viên Panadol Extra?"
+    ]
+  },
+  {
+    "groupId": "group-10",
+    "topic": "Thành phần hoạt chất Augmentin",
+    "expectedMedicineId": "6ad23be6c034632667baaa01",
+    "questions": [
+      "Thuốc Augmentin 1g chứa những hoạt chất gì?",
+      "Thành phần chính của thuốc kháng sinh Augmentin 1g?",
+      "Augmentin 1g có chứa Amoxicillin không?"
+    ]
+  }
+]
+

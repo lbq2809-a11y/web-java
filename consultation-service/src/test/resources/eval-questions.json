@@ -1,0 +1,23 @@
+[
+  { "id": 1, "question": "Bị đau nửa đầu uống thuốc gì?", "expectedMedicineId": "6ad23be6c034632667baaa02", "expectedMedicineName": "Panadol Extra" },
+  { "id": 2, "question": "Thuốc hạ sốt nhanh không gây buồn ngủ?", "expectedMedicineId": "6ad23be6c034632667baaa02", "expectedMedicineName": "Panadol Extra" },
+  { "id": 3, "question": "Viêm tai giữa nên dùng kháng sinh nào?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 4, "question": "Bị viêm phế quản do vi khuẩn uống gì?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 5, "question": "Thuốc giảm sốt dạng viên sủi dễ uống?", "expectedMedicineId": "6ad23be6c034632667baaa03", "expectedMedicineName": "Efferalgan 500mg" },
+  { "id": 6, "question": "Đau răng vừa phải uống gì giảm đau?", "expectedMedicineId": "6ad23be6c034632667baaa03", "expectedMedicineName": "Efferalgan 500mg" },
+  { "id": 7, "question": "Augmentin 1g có điều trị nhiễm khuẩn họng không?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 8, "question": "Thành phần của Efferalgan 500mg là gì?", "expectedMedicineId": "6ad23be6c034632667baaa03", "expectedMedicineName": "Efferalgan 500mg" },
+  { "id": 9, "question": "Panadol Extra có giá bao nhiêu?", "expectedMedicineId": "6ad23be6c034632667baaa02", "expectedMedicineName": "Panadol Extra" },
+  { "id": 10, "question": "Uống Augmentin 1g ngày mấy viên?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 11, "question": "Ai bị dị ứng Amoxicillin có dùng Augmentin được không?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 12, "question": "Thuốc Panadol Extra có cần đơn thuốc bác sĩ không?", "expectedMedicineId": "6ad23be6c034632667baaa02", "expectedMedicineName": "Panadol Extra" },
+  { "id": 13, "question": "Người bị suy gan nặng có uống Efferalgan được không?", "expectedMedicineId": "6ad23be6c034632667baaa03", "expectedMedicineName": "Efferalgan 500mg" },
+  { "id": 14, "question": "Thuốc kháng sinh trị nhiễm trùng đường tiết niệu?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 15, "question": "Sốt cao trên 38.5 độ C nên uống thuốc gì?", "expectedMedicineId": "6ad23be6c034632667baaa02", "expectedMedicineName": "Panadol Extra" },
+  { "id": 16, "question": "Cách dùng Efferalgan viên sủi cho người lớn?", "expectedMedicineId": "6ad23be6c034632667baaa03", "expectedMedicineName": "Efferalgan 500mg" },
+  { "id": 17, "question": "Panadol Extra gồm những chất gì?", "expectedMedicineId": "6ad23be6c034632667baaa02", "expectedMedicineName": "Panadol Extra" },
+  { "id": 18, "question": "Liều dùng Augmentin 1g sau ăn?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 19, "question": "Augmentin là thuốc kê đơn phải không?", "expectedMedicineId": "6ad23be6c034632667baaa01", "expectedMedicineName": "Augmentin 1g" },
+  { "id": 20, "question": "Giá bán Efferalgan 500mg là bao nhiêu?", "expectedMedicineId": "6ad23be6c034632667baaa03", "expectedMedicineName": "Efferalgan 500mg" }
+]
+

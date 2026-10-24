@@ -330,6 +330,141 @@ Mọi lỗi HTTP (`400`, `401`, `403`, `404`, `409`, `422`, `429`, `500`, `503`)
 
 ---
 
+---
+
+### 2.4. `consultation-service` (`http://localhost:8088`)
+*(Thiết kế theo `docs/B9-consultation-ai-rag.md` phục vụ tư vấn thuốc tự động và quản lý lịch sử hội thoại)*
+
+#### (A) Hỏi đáp tư vấn thuốc (Tầng 1 Template-based & Tầng 2 AI RAG)
+- **Caller**: Khách hàng (yêu cầu đăng nhập, JWT hợp lệ), Dược sĩ, Admin.
+- **Method & Path**: `POST /api/v1/consultations/ask`
+- **Headers**:
+  - `Authorization`: `Bearer <accessToken>`
+- **Request Body (`AskRequest`)**:
+  ```json
+  {
+    "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "question": "Bị đau đầu và sốt nên dùng thuốc gì?"
+  }
+  ```
+  *(Nếu `conversationId` bỏ trống hoặc null, hệ thống tự sinh UUID mới)*.
+- **Response thành công (`200 OK` - `AskResponse`)**:
+  ```json
+  {
+    "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "answer": "1. Tóm tắt thông tin: Bạn có thể tham khảo thuốc Panadol Extra hoặc Efferalgan...\n2. Lưu ý quan trọng: ...\n3. Nguồn tham khảo: Panadol Extra, Efferalgan 500mg.",
+    "tier": 2,
+    "intent": "GOI_Y_THUOC",
+    "sources": [
+      {
+        "medicineId": "6ad23be6c034632667baaa02",
+        "medicineName": "Panadol Extra",
+        "section": "indications"
+      },
+      {
+        "medicineId": "6ad23be6c034632667baaa03",
+        "medicineName": "Efferalgan 500mg",
+        "section": "indications"
+      }
+    ],
+    "suggestedMedicines": [],
+    "disclaimer": "Thông tin tư vấn từ trợ lý AI chỉ mang tính chất tham khảo, không thay thế cho chẩn đoán, chỉ định hay tư vấn của bác sĩ và chuyên gia y tế."
+  }
+  ```
+  *(Ghi chú: `tier` nhận giá trị `1` nếu trả lời theo mẫu khuôn và `2` nếu trả lời qua RAG + LLM hoặc chế độ trích đoạn fallback)*.
+- **Mã lỗi**:
+  - `400 Bad Request` (`VALIDATION_ERROR`): Câu hỏi rỗng hoặc vượt quá 500 ký tự.
+  - `401 Unauthorized`: Chưa đăng nhập hoặc token không hợp lệ.
+  - `429 Too Many Requests` (`RATE_LIMIT_EXCEEDED`): Vượt quá giới hạn tần suất câu hỏi (20 req / 60 giây).
+  - `503 Service Unavailable` (`SERVICE_UNAVAILABLE`): Dịch vụ AI gián đoạn và không có đủ dữ liệu trích đoạn.
+
+#### (B) Lấy danh sách phiên hội thoại của người dùng
+- **Caller**: Người dùng đã đăng nhập (chỉ xem được các phiên của chính mình).
+- **Method & Path**: `GET /api/v1/consultations/conversations`
+- **Headers**:
+  - `Authorization`: `Bearer <accessToken>`
+- **Response thành công (`200 OK` - `List<ConversationSummaryResponse>`)**:
+  ```json
+  [
+    {
+      "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+      "title": "Thuốc Panadol uống thế nào?",
+      "messageCount": 2,
+      "createdAt": "2026-10-24T08:00:00Z",
+      "updatedAt": "2026-10-24T08:05:00Z"
+    }
+  ]
+  ```
+
+#### (C) Chi tiết một phiên hội thoại
+- **Caller**: Chủ sở hữu phiên hội thoại (hoặc Admin).
+- **Method & Path**: `GET /api/v1/consultations/conversations/{conversationId}`
+- **Headers**:
+  - `Authorization`: `Bearer <accessToken>`
+- **Response thành công (`200 OK` - `ConversationResponse`)**:
+  ```json
+  {
+    "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+    "title": "Thuốc Panadol uống thế nào?",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Thuốc Panadol uống thế nào?",
+        "sources": [],
+        "tier": 0,
+        "createdAt": "2026-10-24T08:00:00Z"
+      },
+      {
+        "role": "assistant",
+        "content": "Thuốc Panadol Extra có cách dùng như sau: ...",
+        "sources": [
+          {
+            "medicineId": "6ad23be6c034632667baaa01",
+            "medicineName": "Panadol Extra",
+            "section": "dosage"
+          }
+        ],
+        "tier": 1,
+        "createdAt": "2026-10-24T08:00:01Z"
+      }
+    ],
+    "createdAt": "2026-10-24T08:00:00Z",
+    "updatedAt": "2026-10-24T08:05:00Z"
+  }
+  ```
+- **Mã lỗi**:
+  - `403 Forbidden` (`FORBIDDEN`): Không có quyền truy cập phiên của người khác.
+  - `404 Not Found` (`CONVERSATION_NOT_FOUND`): Phiên hội thoại không tồn tại.
+
+#### (D) Xóa phiên hội thoại
+- **Caller**: Chủ sở hữu phiên hội thoại (hoặc Admin).
+- **Method & Path**: `DELETE /api/v1/consultations/conversations/{conversationId}`
+- **Headers**:
+  - `Authorization`: `Bearer <accessToken>`
+- **Response thành công**: `204 No Content`
+- **Mã lỗi**:
+  - `403 Forbidden` (`FORBIDDEN`): Không có quyền xóa phiên của người khác.
+  - `404 Not Found` (`CONVERSATION_NOT_FOUND`): Không tìm thấy phiên hội thoại.
+
+#### (E) Quản trị nạp lại toàn bộ tri thức thuốc (Reindex)
+- **Caller**: ADMIN (`ADMIN`).
+- **Method & Path**: `POST /api/v1/consultations/admin/reindex`
+- **Headers**:
+  - `Authorization`: `Bearer <accessToken>`
+- **Response thành công (`200 OK`)**:
+  ```json
+  {
+    "status": "SUCCESS",
+    "message": "Reindexed successfully",
+    "totalMedicines": 30,
+    "totalChunks": 150
+  }
+  ```
+- **Mã lỗi**:
+  - `403 Forbidden` (`FORBIDDEN`): Không phải vai trò ADMIN.
+
+---
+
 ## 3. Hợp Đồng Sự Kiện Apache Kafka (`localhost:9092`)
 
 - **Broker**: `localhost:9092`

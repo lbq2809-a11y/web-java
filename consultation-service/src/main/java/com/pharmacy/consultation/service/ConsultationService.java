@@ -1,5 +1,7 @@
 package com.pharmacy.consultation.service;
 
+import com.pharmacy.consultation.client.EmbeddingClient;
+import com.pharmacy.consultation.client.LlmClient;
 import com.pharmacy.consultation.dto.AskRequest;
 import com.pharmacy.consultation.dto.AskResponse;
 import com.pharmacy.consultation.dto.ConversationResponse;
@@ -8,22 +10,27 @@ import com.pharmacy.consultation.dto.SuggestedMedicineDto;
 import com.pharmacy.consultation.entity.ConversationDocument;
 import com.pharmacy.consultation.entity.KnowledgeSource;
 import com.pharmacy.consultation.entity.MessageItem;
+import com.pharmacy.consultation.entity.RagCacheDocument;
 import com.pharmacy.consultation.exception.ApiException;
 import com.pharmacy.consultation.repository.ConversationRepository;
+import com.pharmacy.consultation.repository.RagCacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
- * Xử lý nghiệp vụ tư vấn thuốc Tầng 1 và quản lý các phiên hội thoại.
+ * Xử lý nghiệp vụ tư vấn thuốc thông minh kết hợp 2 tầng (Tầng 1 Template và Tầng 2 AI RAG + LLM).
  */
 @ApplicationScoped
 public class ConsultationService {
@@ -48,11 +55,35 @@ public class ConsultationService {
     @Inject
     ConversationRepository conversationRepository;
 
+    @Inject
+    RagCacheRepository ragCacheRepository;
+
+    @Inject
+    VectorSearchService vectorSearchService;
+
+    @Inject
+    EmbeddingClient embeddingClient;
+
+    @Inject
+    LlmClient llmClient;
+
+    @Inject
+    ExtractiveFallbackService extractiveFallbackService;
+
+    @Inject
+    TextNormalizer textNormalizer;
+
     @ConfigProperty(name = "consultation.question.max-length", defaultValue = "500")
     int maxQuestionLength;
 
+    @ConfigProperty(name = "consultation.rag.top-k", defaultValue = "4")
+    int topK;
+
+    @ConfigProperty(name = "consultation.rag.similarity-threshold", defaultValue = "0.65")
+    double similarityThreshold;
+
     /**
-     * Xử lý hỏi đáp tư vấn thuốc (Tầng 1 Template-based & An toàn).
+     * Xử lý hỏi đáp tư vấn thuốc (Tự động định tuyến giữa Tầng 1 và Tầng 2).
      */
     public AskResponse ask(String userId, AskRequest request) {
         long startTime = System.currentTimeMillis();
@@ -75,85 +106,176 @@ public class ConsultationService {
             conversationId = UUID.randomUUID().toString();
         }
 
-        String answerText;
-        String intent = "KHAC";
-        int tier = 1;
-        List<KnowledgeSource> sources = new ArrayList<>();
-        List<SuggestedMedicineDto> suggestions = new ArrayList<>();
-        String disclaimer = templateGenerator.getDisclaimer();
-
         // 3. Kiểm tra an toàn trước tiên (Cấp cứu 115, tự hại, mang thai, trẻ sơ sinh)
         SafetyGuard.SafetyStatus safety = safetyGuard.check(rawQuestion);
         if (safety == SafetyGuard.SafetyStatus.EMERGENCY) {
-            intent = "CAP_CUU";
             TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateEmergencyAnswer();
-            answerText = gen.answer();
-            disclaimer = gen.disclaimer();
-        } else if (safety == SafetyGuard.SafetyStatus.VULNERABLE) {
-            intent = "NHOM_NHAY_CAM";
+            saveConversation(conversationId, userId, rawQuestion, gen.answer(), List.of(), 1);
+            logConsultation(userId, conversationId, "CAP_CUU", 1, startTime);
+            return new AskResponse(conversationId, gen.answer(), 1, "CAP_CUU", List.of(), List.of(), gen.disclaimer());
+        }
+
+        if (safety == SafetyGuard.SafetyStatus.VULNERABLE) {
             TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateVulnerableAnswer();
-            answerText = gen.answer();
-            disclaimer = gen.disclaimer();
-        } else {
-            // 4. Nhận diện thuốc
-            MedicineMatcher.MatchResult matchResult = medicineMatcher.findMatchingMedicines(rawQuestion);
+            saveConversation(conversationId, userId, rawQuestion, gen.answer(), List.of(), 1);
+            logConsultation(userId, conversationId, "NHOM_NHAY_CAM", 1, startTime);
+            return new AskResponse(conversationId, gen.answer(), 1, "NHOM_NHAY_CAM", List.of(), List.of(), gen.disclaimer());
+        }
 
-            if (matchResult.getMatches().size() > 1) {
-                // Khớp nhiều thuốc (ví dụ cùng hoạt chất) -> Trả danh sách gợi ý để người dùng chọn
-                intent = "GOI_Y_THUOC";
-                TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateMultipleMatchAnswer(matchResult.getMatches());
-                answerText = gen.answer();
-                disclaimer = gen.disclaimer();
+        // 4. Kiểm tra Tầng 1: Nhận diện thuốc & phân loại ý định
+        MedicineMatcher.MatchResult matchResult = medicineMatcher.findMatchingMedicines(rawQuestion);
 
-                for (CachedMedicine m : matchResult.getMatches()) {
-                    suggestions.add(new SuggestedMedicineDto(
-                            m.getMedicineId(),
-                            m.getName(),
-                            m.getActiveIngredient(),
-                            m.getPrescriptionType()
-                    ));
-                }
-            } else if (matchResult.isEmpty()) {
-                // Không nhận diện được thuốc -> Trả lời không đủ thông tin
-                intent = "KHAC";
-                TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateUnknownAnswer();
-                answerText = gen.answer();
-                disclaimer = gen.disclaimer();
-            } else {
-                // Khớp đúng 1 thuốc -> Phân loại ý định và điền mẫu
-                CachedMedicine medicine = matchResult.getFirst();
-                intent = intentClassifier.classify(rawQuestion);
+        if (matchResult.getMatches().size() > 1) {
+            // Khớp nhiều thuốc (ví dụ cùng hoạt chất) -> Trả danh sách gợi ý để người dùng chọn
+            TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateMultipleMatchAnswer(matchResult.getMatches());
+            List<SuggestedMedicineDto> suggestions = matchResult.getMatches().stream()
+                    .map(m -> new SuggestedMedicineDto(m.getMedicineId(), m.getName(), m.getActiveIngredient(), m.getPrescriptionType()))
+                    .toList();
+            saveConversation(conversationId, userId, rawQuestion, gen.answer(), List.of(), 1);
+            logConsultation(userId, conversationId, "GOI_Y_THUOC", 1, startTime);
+            return new AskResponse(conversationId, gen.answer(), 1, "GOI_Y_THUOC", List.of(), suggestions, gen.disclaimer());
+        }
 
-                if ("KHAC".equalsIgnoreCase(intent)) {
-                    TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateUnknownAnswer();
-                    answerText = gen.answer();
-                    disclaimer = gen.disclaimer();
-                } else {
-                    TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateForMedicine(medicine, intent);
-                    answerText = gen.answer();
-                    sources = gen.sources();
-                    disclaimer = gen.disclaimer();
-                }
+        if (matchResult.isSingleMatch()) {
+            CachedMedicine medicine = matchResult.getFirst();
+            String intent = intentClassifier.classify(rawQuestion);
+
+            // Nếu câu hỏi khớp rõ 1 thuốc và ý định thuộc 6 nhóm chuẩn -> Trả lời Tầng 1 siêu tốc
+            if (!"KHAC".equalsIgnoreCase(intent)) {
+                TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateForMedicine(medicine, intent);
+                saveConversation(conversationId, userId, rawQuestion, gen.answer(), gen.sources(), 1);
+                logConsultation(userId, conversationId, intent, 1, startTime);
+                return new AskResponse(conversationId, gen.answer(), 1, intent, gen.sources(), List.of(), gen.disclaimer());
             }
         }
 
-        // 5. Lưu lịch sử hội thoại vào MongoDB
-        saveConversation(conversationId, userId, rawQuestion, answerText, sources, tier);
+        // 5. Chuyển tiếp sang TẦNG 2 (RAG + Cosine Search + LLM / Extractive Fallback)
+        return processTier2Rag(userId, conversationId, rawQuestion, startTime);
+    }
 
-        long timeMs = System.currentTimeMillis() - startTime;
-        // TUYỆT ĐỐI KHÔNG log nội dung câu hỏi ở mức INFO để bảo mật thông tin sức khỏe của người dùng
-        LOG.infof("Tư vấn hoàn tất: userId=%s, conversationId=%s, intent=%s, tier=%d, timeMs=%d",
-                userId, conversationId, intent, tier, timeMs);
+    private AskResponse processTier2Rag(String userId, String conversationId, String rawQuestion, long startTime) {
+        String normQ = textNormalizer.normalize(rawQuestion);
+
+        // 1. Sinh vector nhúng cho câu hỏi đã chuẩn hóa
+        List<Double> queryVector = List.of();
+        try {
+            queryVector = embeddingClient.embedText(normQ);
+        } catch (Exception e) {
+            LOG.warnf("Không thể embedding câu hỏi qua API: %s", e.getMessage());
+        }
+
+        // 2. Tìm kiếm Top-K đoạn tương đồng bằng Cosine trong RAM
+        List<VectorSearchService.ScoredChunk> topChunks = List.of();
+        if (queryVector != null && !queryVector.isEmpty()) {
+            topChunks = vectorSearchService.search(queryVector, topK, similarityThreshold);
+        }
+
+        // 3. Nếu không có đoạn nào đạt ngưỡng tối thiểu -> Trả về chưa đủ thông tin
+        if (topChunks.isEmpty()) {
+            TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateUnknownAnswer();
+            saveConversation(conversationId, userId, rawQuestion, gen.answer(), List.of(), 1);
+            logConsultation(userId, conversationId, "KHAC", 1, startTime);
+            return new AskResponse(conversationId, gen.answer(), 1, "KHAC", List.of(), List.of(), gen.disclaimer());
+        }
+
+        // 4. Kiểm tra Cache Tầng 2 trong MongoDB
+        List<String> sortedMedicineIds = topChunks.stream()
+                .map(c -> c.item().medicineId())
+                .distinct()
+                .sorted()
+                .toList();
+
+        String chunksCombined = topChunks.stream()
+                .map(c -> c.item().contentHash() != null ? c.item().contentHash() : c.item().text())
+                .collect(Collectors.joining(";"));
+        String chunksHash = computeSha256(chunksCombined);
+
+        String intent = intentClassifier.classify(rawQuestion);
+        if ("KHAC".equalsIgnoreCase(intent)) {
+            intent = "RAG_CONSULTATION";
+        }
+
+        String cacheKey = computeSha256(intent + "::" + String.join(",", sortedMedicineIds) + "::" + chunksHash);
+
+        Optional<RagCacheDocument> cachedOpt = ragCacheRepository.findByCacheKey(cacheKey);
+        if (cachedOpt.isPresent()) {
+            RagCacheDocument cached = cachedOpt.get();
+            saveConversation(conversationId, userId, rawQuestion, cached.answer, cached.sources, 2);
+            logConsultation(userId, conversationId, cached.intent + "_CACHED", 2, startTime);
+            return new AskResponse(conversationId, cached.answer, 2, cached.intent, cached.sources, List.of(), templateGenerator.getDisclaimer());
+        }
+
+        // 5. Chuẩn bị ngữ cảnh cho LLM
+        List<String> contextList = topChunks.stream()
+                .map(sc -> String.format("Thuốc: %s | Mục: %s | ID: %s\nNội dung: %s",
+                        sc.item().medicineName(), sc.item().section(), sc.item().medicineId(), sc.item().text()))
+                .toList();
+
+        List<KnowledgeSource> sources = topChunks.stream()
+                .map(sc -> new KnowledgeSource(sc.item().medicineId(), sc.item().medicineName(), sc.item().section()))
+                .toList();
+
+        String conversationHistory = getRecentConversationHistory(conversationId);
+
+        // 6. Gọi LLM hoặc Chế độ trích đoạn dự phòng (Extractive Fallback) khi LLM lỗi
+        String answerText;
+        try {
+            answerText = llmClient.generateAnswer(rawQuestion, contextList, conversationHistory);
+            if (answerText == null || answerText.isBlank()) {
+                throw new RuntimeException("LLM trả về câu trả lời rỗng");
+            }
+        } catch (Exception e) {
+            LOG.warnf("Gọi LLM gián đoạn, kích hoạt Chế độ trích đoạn (Extractive Fallback): %s", e.getMessage());
+            ExtractiveFallbackService.FallbackResult fallback = extractiveFallbackService.generateFallback(topChunks);
+            answerText = fallback.answer();
+            sources = fallback.sources();
+        }
+
+        // 7. Lưu câu trả lời vào Cache Tầng 2 trong MongoDB
+        try {
+            RagCacheDocument newCache = new RagCacheDocument(
+                    cacheKey,
+                    intent,
+                    sortedMedicineIds,
+                    chunksHash,
+                    answerText,
+                    sources,
+                    2,
+                    Instant.now()
+            );
+            ragCacheRepository.persist(newCache);
+        } catch (Exception e) {
+            LOG.warnf("Không thể lưu cache RAG: %s", e.getMessage());
+        }
+
+        // 8. Lưu phiên hội thoại
+        saveConversation(conversationId, userId, rawQuestion, answerText, sources, 2);
+        logConsultation(userId, conversationId, intent, 2, startTime);
 
         return new AskResponse(
                 conversationId,
                 answerText,
-                tier,
+                2,
                 intent,
                 sources,
-                suggestions,
-                disclaimer
+                List.of(),
+                templateGenerator.getDisclaimer()
         );
+    }
+
+    private String getRecentConversationHistory(String conversationId) {
+        Optional<ConversationDocument> docOpt = conversationRepository.findByConversationId(conversationId);
+        if (docOpt.isEmpty() || docOpt.get().messages == null || docOpt.get().messages.isEmpty()) {
+            return "";
+        }
+        List<MessageItem> msgs = docOpt.get().messages;
+        int start = Math.max(0, msgs.size() - 4);
+        StringBuilder sb = new StringBuilder();
+        for (int i = start; i < msgs.size(); i++) {
+            MessageItem m = msgs.get(i);
+            sb.append(m.getRole()).append(": ").append(m.getContent()).append("\n");
+        }
+        return sb.toString();
     }
 
     private void saveConversation(String conversationId, String userId, String question,
@@ -169,7 +291,6 @@ public class ConsultationService {
             doc = new ConversationDocument(conversationId, userId, title, now, now);
         }
 
-        // Thêm câu hỏi của user và câu trả lời của AI
         doc.messages.add(new MessageItem("user", question, List.of(), 0, now));
         doc.messages.add(new MessageItem("assistant", answer, sources, tier, now));
         doc.updatedAt = now;
@@ -178,6 +299,30 @@ public class ConsultationService {
             conversationRepository.update(doc);
         } else {
             conversationRepository.persist(doc);
+        }
+    }
+
+    private void logConsultation(String userId, String conversationId, String intent, int tier, long startTime) {
+        long timeMs = System.currentTimeMillis() - startTime;
+        // TUYỆT ĐỐI KHÔNG log nội dung câu hỏi ở mức INFO để bảo vệ bí mật thông tin y tế
+        LOG.infof("Tư vấn hoàn tất: userId=%s, conversationId=%s, intent=%s, tier=%d, timeMs=%d",
+                userId, conversationId, intent, tier, timeMs);
+    }
+
+    private String computeSha256(String input) {
+        if (input == null) return "";
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            return String.valueOf(input.hashCode());
         }
     }
 
@@ -222,4 +367,3 @@ public class ConsultationService {
         conversationRepository.deleteByConversationId(conversationId);
     }
 }
-
