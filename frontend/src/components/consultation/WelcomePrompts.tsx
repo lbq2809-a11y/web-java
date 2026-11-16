@@ -1,10 +1,10 @@
 import { MessageSquarePlus, Sparkles, ShieldCheck } from 'lucide-react';
 
 const SUGGESTED_QUESTIONS = [
+  'Tôi bị sốt nhẹ kèm đau đầu thì có thuốc không kê đơn nào phù hợp?',
   'Augmentin dùng để làm gì và cần lưu ý gì?',
-  'Phân biệt thuốc hạ sốt Paracetamol và Ibuprofen?',
-  'Uống kháng sinh cần tuân thủ nguyên tắc gì?',
-  'Thuốc nhỏ mắt và nước muối sinh lý dùng hàng ngày có khác nhau không?',
+  'Đau dạ dày, ợ chua có thuốc không kê đơn nào hỗ trợ giảm đau?',
+  'Siro ho và thuốc tiêu đờm nào phù hợp khi bị ho có đờm?',
 ];
 
 interface WelcomePromptsProps {

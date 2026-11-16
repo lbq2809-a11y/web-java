@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <rect width="240" height="240" rx="24" fill="#F0FDFA"/>
+  <rect x="64" y="42" width="112" height="148" rx="14" fill="#FFFFFF" stroke="#0F766E" stroke-width="3"/>
+  <path d="M64 62H176" stroke="#CCFBF1" stroke-width="3" stroke-dasharray="6 4"/>
+  <rect x="82" y="82" width="76" height="56" rx="10" fill="#F0FDFA" stroke="#CCFBF1" stroke-width="2"/>
+  <path d="M120 94V126M104 110H136" stroke="#0F766E" stroke-width="4" stroke-linecap="round"/>
+  <rect x="82" y="152" width="76" height="16" rx="8" fill="#CCFBF1"/>
+  <text x="120" y="214" text-anchor="middle" fill="#0F766E" font-family="sans-serif" font-size="12" font-weight="700">GÓI PHA / HỖN DỊCH</text>
+</svg>

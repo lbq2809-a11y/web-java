@@ -151,6 +151,53 @@ public class TemplateAnswerGenerator {
         return new GeneratedAnswer(sb.toString().trim(), List.of(), getDisclaimer());
     }
 
+    /**
+     * Tổng hợp câu trả lời Tầng 1 khi truy xuất theo triệu chứng/công dụng từ dữ liệu thuốc.
+     */
+    public GeneratedAnswer generateSymptomMatchAnswer(List<CachedMedicine> matches, boolean otcRequested) {
+        StringBuilder sb = new StringBuilder();
+        if (otcRequested) {
+            sb.append("Dựa trên triệu chứng bạn mô tả, dưới đây là các thuốc **không kê đơn (OTC)** phù hợp có trong danh mục nhà thuốc:\n");
+        } else {
+            sb.append("Dựa trên triệu chứng bạn mô tả, bạn có thể tham khảo các thuốc phù hợp sau từ dữ liệu nhà thuốc:\n");
+        }
+
+        List<KnowledgeSource> sources = new ArrayList<>();
+        boolean hasEtc = false;
+
+        for (CachedMedicine m : matches) {
+            boolean isEtc = "ETC".equalsIgnoreCase(m.getPrescriptionType());
+            if (isEtc) {
+                hasEtc = true;
+            }
+            String typeLabel = isEtc ? "Thuốc kê đơn - ETC" : "Không kê đơn - OTC";
+            sb.append("- **").append(m.getName()).append("** (").append(typeLabel).append(")");
+
+            if (m.getActiveIngredient() != null && !m.getActiveIngredient().isBlank()) {
+                sb.append(" — Hoạt chất: `").append(m.getActiveIngredient()).append("`");
+            }
+            if (m.getIndications() != null && !m.getIndications().isBlank()) {
+                sb.append(". Công dụng: ").append(m.getIndications());
+            }
+            if (m.getDosage() != null && !m.getDosage().isBlank()) {
+                sb.append(" Cách dùng tham khảo: ").append(m.getDosage());
+            }
+            sb.append("\n");
+
+            if (m.getMedicineId() != null) {
+                sources.add(new KnowledgeSource(m.getMedicineId(), m.getName(), "indications"));
+            }
+        }
+
+        if (hasEtc) {
+            String etcWarning = templatesMap.getOrDefault("ETC_WARNING",
+                    "\n\n⚠️ Lưu ý quan trọng: Trong gợi ý có thuốc kê đơn (ETC), bắt buộc phải có chỉ định và đơn thuốc của bác sĩ.");
+            sb.append(etcWarning);
+        }
+
+        return new GeneratedAnswer(sb.toString().trim(), sources, getDisclaimer());
+    }
+
     public String getDisclaimer() {
         return templatesMap.getOrDefault("DISCLAIMER",
                 "Thông tin tư vấn từ trợ lý AI chỉ mang tính chất tham khảo, không thay thế cho chẩn đoán, chỉ định hay tư vấn của bác sĩ và chuyên gia y tế.");

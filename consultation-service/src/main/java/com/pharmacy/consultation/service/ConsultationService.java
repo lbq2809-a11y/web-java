@@ -73,6 +73,12 @@ public class ConsultationService {
     @Inject
     TextNormalizer textNormalizer;
 
+    @Inject
+    KnowledgeIngestionService knowledgeIngestionService;
+
+    @Inject
+    SymptomMatcher symptomMatcher;
+
     @ConfigProperty(name = "consultation.question.max-length", defaultValue = "500")
     int maxQuestionLength;
 
@@ -122,7 +128,8 @@ public class ConsultationService {
             return new AskResponse(conversationId, gen.answer(), 1, "NHOM_NHAY_CAM", List.of(), List.of(), gen.disclaimer());
         }
 
-        // 4. Kiểm tra Tầng 1: Nhận diện thuốc & phân loại ý định
+        // 4. Đảm bảo tri thức thuốc đã nạp sẵn sàng, sau đó kiểm tra Tầng 1: Nhận diện thuốc & phân loại ý định
+        knowledgeIngestionService.ensureKnowledgeLoaded();
         MedicineMatcher.MatchResult matchResult = medicineMatcher.findMatchingMedicines(rawQuestion);
 
         if (matchResult.getMatches().size() > 1) {
@@ -170,8 +177,30 @@ public class ConsultationService {
             topChunks = vectorSearchService.search(queryVector, topK, similarityThreshold);
         }
 
-        // 3. Nếu không có đoạn nào đạt ngưỡng tối thiểu -> Trả về chưa đủ thông tin
+        // 3. Nếu Tầng 2 không có vector/LLM khả dụng hoặc không đạt ngưỡng -> thử Truy xuất Triệu chứng Tầng 1
         if (topChunks.isEmpty()) {
+            SymptomMatcher.SymptomMatchResult symptomResult = symptomMatcher.findBySymptoms(rawQuestion);
+            if (!symptomResult.medicines().isEmpty()) {
+                TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateSymptomMatchAnswer(
+                        symptomResult.medicines(),
+                        symptomResult.otcRequested()
+                );
+                List<SuggestedMedicineDto> suggestions = symptomResult.medicines().stream()
+                        .map(m -> new SuggestedMedicineDto(m.getMedicineId(), m.getName(), m.getActiveIngredient(), m.getPrescriptionType()))
+                        .toList();
+                saveConversation(conversationId, userId, rawQuestion, gen.answer(), gen.sources(), 1);
+                logConsultation(userId, conversationId, "GOI_Y_THEO_TRIEU_CHUNG", 1, startTime);
+                return new AskResponse(
+                        conversationId,
+                        gen.answer(),
+                        1,
+                        "GOI_Y_THEO_TRIEU_CHUNG",
+                        gen.sources(),
+                        suggestions,
+                        gen.disclaimer()
+                );
+            }
+
             TemplateAnswerGenerator.GeneratedAnswer gen = templateGenerator.generateUnknownAnswer();
             saveConversation(conversationId, userId, rawQuestion, gen.answer(), List.of(), 1);
             logConsultation(userId, conversationId, "KHAC", 1, startTime);

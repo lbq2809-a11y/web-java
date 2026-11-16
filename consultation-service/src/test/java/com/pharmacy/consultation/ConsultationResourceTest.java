@@ -76,6 +76,9 @@ public class ConsultationResourceTest {
     VectorSearchService vectorSearchService;
 
     @Inject
+    com.pharmacy.consultation.service.VectorKnowledgeStore vectorKnowledgeStore;
+
+    @Inject
     MockLlmClient mockLlmClient;
 
     @Inject
@@ -754,6 +757,34 @@ public class ConsultationResourceTest {
             double hitRate = ((double) hits / total) * 100.0;
             System.out.printf("=== KẾT QUẢ ĐÁNH GIÁ TRUY XUẤT RAG (TEST F.4): %d/%d (%.2f%%) ===%n", hits, total, hitRate);
             Assertions.assertTrue(hitRate >= 85.0, String.format("Tỷ lệ truy xuất đạt %.2f%%, thấp hơn ngưỡng yêu cầu 85%%", hitRate));
+        }
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("21. Truy xuất triệu chứng Tầng 1 hoạt động khi chưa cấu hình Tầng 2 LLM/Embedding")
+    void testTier1SymptomRetrievalWithoutLlm() {
+        rateLimiterService.reset();
+        // Mô phỏng môi trường chưa có vector Tầng 2 (chưa cấu hình LLM API key)
+        vectorKnowledgeStore.updateVectors(List.of());
+        try {
+            AskRequest req = new AskRequest(null, "Tôi bị sốt nhẹ kèm đau đầu thì có thuốc không kê đơn nào phù hợp?");
+            given()
+                    .header("Authorization", "Bearer " + user1Token)
+                    .contentType(ContentType.JSON)
+                    .body(req)
+                    .when().post("/api/v1/consultations/ask")
+                    .then()
+                    .statusCode(200)
+                    .body("tier", equalTo(1))
+                    .body("intent", equalTo("GOI_Y_THEO_TRIEU_CHUNG"))
+                    .body("sources", not(empty()))
+                    .body("sources.medicineName", anyOf(hasItem("Panadol Extra"), hasItem("Efferalgan 500mg")))
+                    .body("suggestedMedicines.prescriptionType", everyItem(equalTo("OTC")))
+                    .body("answer", containsString("không kê đơn (OTC)"))
+                    .body("disclaimer", notNullValue());
+        } finally {
+            knowledgeIngestionService.reindex();
         }
     }
 }

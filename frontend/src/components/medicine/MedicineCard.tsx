@@ -1,16 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Pill, Star } from 'lucide-react';
+import { ArrowRight, Star } from 'lucide-react';
 import type { MedicineResponse } from '@/types/medicine.types';
-import { formatCurrencyVnd } from '@/lib/utils';
+import { cn, formatCurrencyVnd } from '@/lib/utils';
 import { MedicineBadge } from './MedicineBadge';
+
+const FALLBACK_MEDICINE_IMAGE = '/images/medicines/default-medicine.svg';
 
 interface MedicineCardProps {
   medicine: MedicineResponse;
 }
 
 export function MedicineCard({ medicine }: MedicineCardProps) {
-  const [imgError, setImgError] = useState(false);
+  const initialSrc =
+    medicine.imageUrl && medicine.imageUrl.trim().length > 0
+      ? medicine.imageUrl
+      : FALLBACK_MEDICINE_IMAGE;
+
+  const [imgSrc, setImgSrc] = useState<string>(initialSrc);
+
+  useEffect(() => {
+    setImgSrc(
+      medicine.imageUrl && medicine.imageUrl.trim().length > 0
+        ? medicine.imageUrl
+        : FALLBACK_MEDICINE_IMAGE,
+    );
+  }, [medicine.imageUrl]);
+
+  const isSvgAsset = imgSrc.endsWith('.svg');
 
   return (
     <Link
@@ -18,20 +35,20 @@ export function MedicineCard({ medicine }: MedicineCardProps) {
       className="group flex flex-col overflow-hidden rounded-xl border border-[#E2E8F0] bg-white transition-all hover:border-[#0F766E]/50 hover:shadow-sm"
     >
       <div className="relative flex h-44 w-full items-center justify-center overflow-hidden border-b border-[#E2E8F0] bg-[#F8FAFC]">
-        {medicine.imageUrl && !imgError ? (
-          <img
-            src={medicine.imageUrl}
-            alt={medicine.name}
-            onError={() => setImgError(true)}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-2 text-[#94A3B8]">
-            <Pill className="h-10 w-10 text-[#0F766E]/40" />
-            <span className="font-mono text-xs">{medicine.code}</span>
-          </div>
-        )}
+        <img
+          src={imgSrc}
+          alt={medicine.name}
+          onError={() => {
+            if (imgSrc !== FALLBACK_MEDICINE_IMAGE) {
+              setImgSrc(FALLBACK_MEDICINE_IMAGE);
+            }
+          }}
+          className={cn(
+            'h-full w-full transition-transform duration-300 group-hover:scale-[1.03]',
+            isSvgAsset ? 'object-contain p-3' : 'object-cover',
+          )}
+          loading="lazy"
+        />
         <div className="absolute left-3 top-3">
           <MedicineBadge type={medicine.prescriptionType} />
         </div>

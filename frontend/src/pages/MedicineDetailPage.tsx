@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -17,14 +17,24 @@ import { Button } from '@/components/ui/button';
 import { MedicineBadge } from '@/components/medicine/MedicineBadge';
 import { MedicineDetailSkeleton } from '@/components/medicine/MedicineSkeleton';
 import { useMedicineDetailQuery } from '@/hooks/useMedicines';
-import { formatCurrencyVnd } from '@/lib/utils';
+import { cn, formatCurrencyVnd } from '@/lib/utils';
 import { normalizeApiError } from '@/api/httpClient';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+const FALLBACK_MEDICINE_IMAGE = '/images/medicines/default-medicine.svg';
 
 export function MedicineDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: medicine, isLoading, isError, error } = useMedicineDetailQuery(id);
-  const [imgError, setImgError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string>(FALLBACK_MEDICINE_IMAGE);
+
+  useEffect(() => {
+    if (medicine?.imageUrl && medicine.imageUrl.trim().length > 0) {
+      setImgSrc(medicine.imageUrl);
+    } else {
+      setImgSrc(FALLBACK_MEDICINE_IMAGE);
+    }
+  }, [medicine?.imageUrl]);
 
   if (isLoading) {
     return (
@@ -101,19 +111,19 @@ export function MedicineDetailPage() {
           {/* Hình ảnh */}
           <div className="md:col-span-5">
             <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-[#E2E8F0] bg-[#F8FAFC]">
-              {medicine.imageUrl && !imgError ? (
-                <img
-                  src={medicine.imageUrl}
-                  alt={medicine.name}
-                  onError={() => setImgError(true)}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-3 text-[#94A3B8]">
-                  <Pill className="h-14 w-14 text-[#0F766E]/40" />
-                  <span className="font-mono text-sm">{medicine.code}</span>
-                </div>
-              )}
+              <img
+                src={imgSrc}
+                alt={medicine.name}
+                onError={() => {
+                  if (imgSrc !== FALLBACK_MEDICINE_IMAGE) {
+                    setImgSrc(FALLBACK_MEDICINE_IMAGE);
+                  }
+                }}
+                className={cn(
+                  'h-full w-full',
+                  imgSrc.endsWith('.svg') ? 'object-contain p-6' : 'object-cover',
+                )}
+              />
             </div>
           </div>
 
