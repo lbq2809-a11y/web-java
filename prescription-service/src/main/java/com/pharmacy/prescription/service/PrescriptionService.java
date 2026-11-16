@@ -118,6 +118,22 @@ public class PrescriptionService {
     }
 
     /**
+     * Dược sĩ và Admin lấy danh sách toàn bộ đơn thuốc hệ thống (hỗ trợ lọc trạng thái, mới nhất lên đầu)
+     */
+    @Transactional
+    public PrescriptionPageResponse getAllPrescriptions(PrescriptionStatus status, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = (size > 0 && size <= 100) ? size : 20;
+
+        List<Prescription> list = prescriptionRepo.findAllPrescriptions(status, safePage, safeSize);
+        long total = prescriptionRepo.countAllPrescriptions(status);
+        int totalPages = (int) Math.ceil((double) total / safeSize);
+
+        List<PrescriptionResponse> responses = list.stream().map(mapper::toResponse).toList();
+        return new PrescriptionPageResponse(responses, safePage, safeSize, total, totalPages);
+    }
+
+    /**
      * Dược sĩ và Admin lấy danh sách đơn thuốc đang chờ duyệt (ưu tiên đơn gửi trước duyệt trước)
      */
     public PrescriptionPageResponse getPendingPrescriptions(int page, int size) {

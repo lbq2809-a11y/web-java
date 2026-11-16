@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <rect width="240" height="240" rx="24" fill="#F0FDFA"/>
+  <rect x="98" y="34" width="44" height="20" rx="5" fill="#0F766E"/>
+  <path d="M98 54H142L156 80V182C156 188.627 150.627 194 144 194H96C89.3726 194 84 188.627 84 182V80L98 54Z" fill="#FFFFFF" stroke="#0F766E" stroke-width="3"/>
+  <rect x="94" y="102" width="52" height="60" rx="8" fill="#CCFBF1"/>
+  <path d="M120 118V146M106 132H134" stroke="#0F766E" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="120" y="218" text-anchor="middle" fill="#0F766E" font-family="sans-serif" font-size="12" font-weight="700">SIRO / DUNG DỊCH</text>
+</svg>

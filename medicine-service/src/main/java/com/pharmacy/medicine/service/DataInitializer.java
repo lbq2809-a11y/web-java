@@ -97,10 +97,12 @@ public class DataInitializer {
     }
 
     /**
-     * Nạp 6 danh mục và 30 thuốc DEMO (18 OTC, 12 ETC) khi collection còn trống.
+     * Nạp 6 danh mục và 30 thuốc DEMO (18 OTC, 12 ETC) khi collection còn trống,
+     * đồng thời tự động nâng cấp các ảnh mẫu cũ (placehold.co) sang ảnh minh họa dược phẩm nội bộ.
      */
     public void seedDemoDataIfEmpty() {
         if (medicineRepository.count() > 0) {
+            migrateLegacyPlaceholderImages();
             return;
         }
 
@@ -340,7 +342,7 @@ public class DataInitializer {
         doc.manufacturer = manufacturer;
         doc.unit = unit;
         doc.price = price;
-        doc.imageUrl = "https://placehold.co/400x400?text=" + code;
+        doc.imageUrl = resolveDemoImageUrl(unit, prescriptionType, category.code, category.name);
         doc.indications = indications;
         doc.contraindications = contraindications;
         doc.dosage = dosage;
@@ -354,6 +356,51 @@ public class DataInitializer {
         doc.createdAt = now;
         doc.updatedAt = now;
         return doc;
+    }
+
+    /**
+     * Tự động cập nhật các bản ghi thuốc cũ đang dùng URL placehold.co hoặc trống sang ảnh SVG nội bộ.
+     */
+    private void migrateLegacyPlaceholderImages() {
+        List<MedicineDocument> all = medicineRepository.listAll();
+        int updated = 0;
+        Instant now = Instant.now();
+        for (MedicineDocument doc : all) {
+            if (doc.imageUrl == null || doc.imageUrl.isBlank() || doc.imageUrl.startsWith("https://placehold.co/")) {
+                doc.imageUrl = resolveDemoImageUrl(doc.unit, doc.prescriptionType, null, doc.categoryName);
+                doc.updatedAt = now;
+                medicineRepository.update(doc);
+                updated++;
+            }
+        }
+        if (updated > 0) {
+            LOG.infof("Đã tự động nâng cấp imageUrl cho %d thuốc từ placehold.co sang ảnh minh họa dược phẩm.", updated);
+        }
+    }
+
+    private String resolveDemoImageUrl(String unit, PrescriptionType type, String categoryCode, String categoryName) {
+        String lowerUnit = unit != null ? unit.toLowerCase() : "";
+        String lowerCat = categoryName != null ? categoryName.toLowerCase() : "";
+
+        if (lowerUnit.contains("sủi")) {
+            return "/images/medicines/effervescent.svg";
+        }
+        if (lowerUnit.contains("chai") || lowerUnit.contains("ống")) {
+            return "/images/medicines/syrup-bottle.svg";
+        }
+        if (lowerUnit.contains("gói")) {
+            return "/images/medicines/sachet-digestive.svg";
+        }
+        if ("CAT_ANTIBIOTIC".equals(categoryCode) || lowerCat.contains("kháng sinh")) {
+            return "/images/medicines/antibiotic-etc.svg";
+        }
+        if ("CAT_CARDIO_METABOLIC".equals(categoryCode) || lowerCat.contains("tim mạch")) {
+            return "/images/medicines/cardio-etc.svg";
+        }
+        if (type == PrescriptionType.ETC) {
+            return "/images/medicines/tablet-etc.svg";
+        }
+        return "/images/medicines/tablet-otc.svg";
     }
 }
 

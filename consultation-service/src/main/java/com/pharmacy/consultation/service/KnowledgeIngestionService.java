@@ -31,6 +31,7 @@ public class KnowledgeIngestionService {
 
     private static final Logger LOG = Logger.getLogger(KnowledgeIngestionService.class);
     private static final int PAGE_SIZE = 100;
+    private volatile long lastSyncAttemptMs = 0L;
 
     @Inject
     @RestClient
@@ -59,7 +60,29 @@ public class KnowledgeIngestionService {
         try {
             ingestAllMedicines();
         } catch (Exception e) {
-            LOG.warnf("Chưa thể đồng bộ thuốc từ medicine-service lúc khởi động: %s. Service vẫn hoạt động bình thường.", e.getMessage());
+            LOG.warnf("Chưa thể đồng bộ thuốc từ medicine-service lúc khởi động: %s. Thử nạp từ MongoDB cục bộ.", e.getMessage());
+            loadCacheFromMongoChunks();
+        }
+    }
+
+    /**
+     * Đảm bảo cache thuốc trong RAM luôn sẵn sàng (chống lệch thứ tự khởi động giữa consultation-service và medicine-service).
+     */
+    public synchronized void ensureKnowledgeLoaded() {
+        if (medicineCache.size() > 0) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastSyncAttemptMs > 10_000L) {
+            lastSyncAttemptMs = now;
+            try {
+                ingestAllMedicines();
+            } catch (Exception e) {
+                LOG.warnf("Đồng bộ lười từ medicine-service chưa thành công: %s", e.getMessage());
+            }
+        }
+        if (medicineCache.size() == 0) {
+            loadCacheFromMongoChunks();
         }
     }
 
@@ -134,6 +157,12 @@ public class KnowledgeIngestionService {
             page++;
         }
 
+        if (cachedList.isEmpty()) {
+            LOG.warn("Không lấy được danh sách thuốc từ medicine-service, giữ nguyên cache và nạp từ knowledge_chunks MongoDB.");
+            loadCacheFromMongoChunks();
+            return new ReindexResult(medicineCache.size(), 0);
+        }
+
         medicineCache.update(cachedList);
 
         // 3. Tính toán và cập nhật Vector Embeddings cho các chunk
@@ -149,6 +178,71 @@ public class KnowledgeIngestionService {
 
         LOG.infof("Đồng bộ hoàn tất: %d thuốc, %d chunks tri thức.", totalMedicines, totalChunks);
         return new ReindexResult(totalMedicines, totalChunks);
+    }
+
+    /**
+     * Nạp ngược dữ liệu thuốc vào RAM từ collection knowledge_chunks trong MongoDB
+     * khi medicine-service chưa sẵn sàng lúc khởi động.
+     */
+    private void loadCacheFromMongoChunks() {
+        try {
+            List<KnowledgeChunkDocument> allChunks = chunkRepository.listAll();
+            if (allChunks == null || allChunks.isEmpty()) {
+                return;
+            }
+            java.util.Map<String, CachedMedicine> map = new java.util.LinkedHashMap<>();
+            List<VectorItem> ramVectors = new ArrayList<>();
+
+            for (KnowledgeChunkDocument c : allChunks) {
+                if (c.medicineId == null) {
+                    continue;
+                }
+                CachedMedicine cm = map.computeIfAbsent(c.medicineId, id -> {
+                    CachedMedicine item = new CachedMedicine();
+                    item.setMedicineId(id);
+                    item.setName(c.medicineName);
+                    item.setNormalizedName(textNormalizer.normalize(c.medicineName));
+                    item.setNoDiacriticsName(textNormalizer.normalizeWithoutDiacritics(c.medicineName));
+                    return item;
+                });
+
+                if ("indications".equals(c.section)) {
+                    cm.setIndications(c.text);
+                } else if ("contraindications".equals(c.section)) {
+                    cm.setContraindications(c.text);
+                } else if ("dosage".equals(c.section)) {
+                    cm.setDosage(c.text);
+                } else if ("composition".equals(c.section)) {
+                    cm.setActiveIngredient(c.text);
+                    cm.setNormalizedActiveIngredient(textNormalizer.normalize(c.text));
+                    cm.setNoDiacriticsActiveIngredient(textNormalizer.normalizeWithoutDiacritics(c.text));
+                } else if ("general".equals(c.section) && c.text != null) {
+                    cm.setPrescriptionType(c.text.contains("Nhóm: ETC") ? "ETC" : "OTC");
+                }
+
+                if (c.embedding != null && !c.embedding.isEmpty()) {
+                    ramVectors.add(new VectorItem(
+                            c.id != null ? c.id.toHexString() : null,
+                            c.medicineId,
+                            c.medicineName,
+                            c.section,
+                            c.text,
+                            c.embedding,
+                            c.contentHash
+                    ));
+                }
+            }
+
+            if (!map.isEmpty()) {
+                medicineCache.update(new ArrayList<>(map.values()));
+                LOG.infof("Đã nạp %d thuốc từ knowledge_chunks MongoDB vào RAM.", map.size());
+            }
+            if (!ramVectors.isEmpty()) {
+                vectorStore.updateVectors(ramVectors);
+            }
+        } catch (Exception e) {
+            LOG.warnf("Lỗi khi nạp tri thức dự phòng từ MongoDB: %s", e.getMessage());
+        }
     }
 
     private int saveOrUpdateChunk(String medicineId, String medicineName, String section, String text) {

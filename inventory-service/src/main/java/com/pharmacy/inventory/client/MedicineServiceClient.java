@@ -24,6 +24,15 @@ import java.util.List;
 public interface MedicineServiceClient {
 
     @GET
+    @Timeout(value = 5, unit = ChronoUnit.SECONDS)
+    @Retry(maxRetries = 2, delay = 500, delayUnit = ChronoUnit.MILLIS)
+    MedicinePagedResponse getMedicines(
+            @QueryParam("page") int page,
+            @QueryParam("size") int size,
+            @QueryParam("includeInactive") boolean includeInactive
+    );
+
+    @GET
     @Path("/batch")
     @Timeout(value = 3, unit = ChronoUnit.SECONDS)
     @Retry(maxRetries = 2, delay = 200, delayUnit = ChronoUnit.MILLIS)

@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-canvas: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border-subtle: #E2E8F0;
+  --color-primary: #0F766E;
+  --color-primary-hover: #115E59;
+  --color-accent-bg: #F0FDFA;
+  --color-accent-border: #CCFBF1;
+  --color-text-main: #0F172A;
+  --color-text-muted: #475569;
+  --color-etc-bg: #FEF3C7;
+  --color-etc-text: #B45309;
+  --color-etc-border: #F59E0B;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: #F8FAFC;
+    color: #0F172A;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: #F8FAFC;
+    color: #0F172A;
+  }
+}
+
+/* Custom subtle scrollbars for clinical workspace */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}

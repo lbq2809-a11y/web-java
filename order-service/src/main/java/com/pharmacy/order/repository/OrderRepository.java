@@ -58,5 +58,25 @@ public class OrderRepository implements PanacheRepositoryBase<Order, UUID> {
         }
         return count("customerId = ?1", customerId);
     }
+
+    /**
+     * Lấy danh sách toàn bộ đơn hàng hệ thống cho Dược sĩ/Admin (sắp xếp mới nhất lên đầu)
+     */
+    public List<Order> findAllOrders(OrderStatus status, int page, int size) {
+        PanacheQuery<Order> query = (status != null)
+                ? find("status = ?1", Sort.by("createdAt").descending(), status)
+                : findAll(Sort.by("createdAt").descending());
+        return query.page(Page.of(page, size)).list();
+    }
+
+    /**
+     * Đếm tổng số đơn hàng toàn hệ thống
+     */
+    public long countAllOrders(OrderStatus status) {
+        if (status != null) {
+            return count("status = ?1", status);
+        }
+        return count();
+    }
 }
 

@@ -31,6 +31,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.logging.Logger;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -262,6 +264,72 @@ public class InventoryService {
             LOG.warnf("Không thể lấy tên thuốc từ medicine-service: %s", e.getMessage());
         }
         return Collections.emptyMap();
+    }
+
+    /**
+     * Khởi tạo sẵn 1-2 lô hàng mẫu (hạn dùng 2027-2028, số lượng 50-150 mỗi lô)
+     * cho thuốc chưa có tồn kho khả dụng trong inventory_db.
+     */
+    @Transactional
+    public int seedInitialStockForMedicine(MedicineResponse medicine) {
+        if (medicine == null || medicine.id == null || medicine.id.length() != 24 || !medicine.active) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now();
+        long currentAvailable = batchRepository.sumAvailableQuantity(medicine.id, today);
+        if (currentAvailable > 0) {
+            return 0;
+        }
+
+        int hash = Math.abs(medicine.id.hashCode());
+        // Tránh giá trị Integer.MIN_VALUE vẫn âm sau Math.abs
+        if (hash < 0) {
+            hash = 17;
+        }
+
+        int batchCount = 1 + (hash % 2);
+        BigDecimal costPrice = (medicine.price != null && medicine.price.compareTo(BigDecimal.ZERO) > 0)
+                ? medicine.price.multiply(new BigDecimal("0.70")).setScale(2, RoundingMode.HALF_UP)
+                : new BigDecimal("25000.00");
+
+        String codePrefix = (medicine.code != null && !medicine.code.isBlank())
+                ? medicine.code.replaceAll("[^A-Za-z0-9_-]", "")
+                : medicine.id.substring(18).toUpperCase();
+
+        int created = 0;
+        for (int index = 0; index < batchCount; index++) {
+            int year = (index == 0) ? 2027 : 2028;
+            int month = (index == 0) ? (3 + (hash % 9)) : (2 + ((hash / 3) % 10));
+            int day = (index == 0) ? 15 : 20;
+            LocalDate expiryDate = LocalDate.of(year, month, day);
+
+            int qtySeed = (index == 0) ? hash : (hash / 7 + 19);
+            int quantity = 50 + (Math.abs(qtySeed) % 101);
+
+            String batchNumber = resolveUniqueBatchNumber(medicine.id, "SEED-" + codePrefix + "-" + year);
+            CreateBatchRequest request = new CreateBatchRequest(
+                    medicine.id,
+                    batchNumber,
+                    expiryDate,
+                    quantity,
+                    costPrice
+            );
+            createBatch(request, "SYSTEM_SEED");
+            created++;
+        }
+
+        return created;
+    }
+
+    private String resolveUniqueBatchNumber(String medicineId, String baseBatchNumber) {
+        String candidate = baseBatchNumber;
+        int suffix = 1;
+        while (batchRepository.findByMedicineIdAndBatchNumber(medicineId, candidate).isPresent()) {
+            candidate = baseBatchNumber + "-" + suffix;
+            suffix++;
+        }
+        return candidate;
     }
 }
 

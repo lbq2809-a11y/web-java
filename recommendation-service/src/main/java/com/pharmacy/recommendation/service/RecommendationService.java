@@ -5,6 +5,7 @@ import com.pharmacy.recommendation.document.PendingOrderDocument;
 import com.pharmacy.recommendation.document.ProductCooccurrenceDocument;
 import com.pharmacy.recommendation.document.ProductStatsDocument;
 import com.pharmacy.recommendation.document.UserPurchaseHistoryDocument;
+import com.pharmacy.recommendation.dto.MedicineCatalogPageResponse;
 import com.pharmacy.recommendation.dto.MedicineResponse;
 import com.pharmacy.recommendation.dto.OrderCreatedEvent;
 import com.pharmacy.recommendation.dto.OrderItemDto;
@@ -181,7 +182,7 @@ public class RecommendationService {
 
         List<ProductCooccurrenceDocument> cooccurrences = cooccurrenceRepository.findTopCooccurring(medicineId, 50);
         if (cooccurrences.isEmpty()) {
-            return List.of();
+            return getActiveOtcCatalogFallback(Set.of(medicineId), limit, "FREQUENTLY_BOUGHT_TOGETHER");
         }
 
         List<String> candidateIds = cooccurrences.stream()
@@ -191,7 +192,7 @@ public class RecommendationService {
                 .toList();
 
         if (candidateIds.isEmpty()) {
-            return List.of();
+            return getActiveOtcCatalogFallback(Set.of(medicineId), limit, "FREQUENTLY_BOUGHT_TOGETHER");
         }
 
         try {
@@ -220,7 +221,10 @@ public class RecommendationService {
                     }
                 }
             }
-            return results;
+            if (!results.isEmpty()) {
+                return results;
+            }
+            return getActiveOtcCatalogFallback(Set.of(medicineId), limit, "FREQUENTLY_BOUGHT_TOGETHER");
         } catch (Exception e) {
             LOG.warnf("Lỗi khi gọi medicine-service lấy chi tiết also-bought: %s. Chuyển sang fallback an toàn.", e.getMessage());
             // Fallback an toàn: Trả danh sách rút gọn chỉ gồm ID và reason, tuyệt đối không trả lỗi 500
@@ -326,14 +330,14 @@ public class RecommendationService {
                 .toList();
 
         if (candidateIds.isEmpty()) {
-            return List.of();
+            return getActiveOtcCatalogFallback(excludedIds, limit, "BEST_SELLER");
         }
 
         try {
             String idsParam = String.join(",", candidateIds);
             List<MedicineResponse> medicines = medicineServiceClient.getMedicinesBatch(idsParam);
             if (medicines == null || medicines.isEmpty()) {
-                return List.of();
+                return getActiveOtcCatalogFallback(excludedIds, limit, "BEST_SELLER");
             }
 
             Map<String, MedicineResponse> medMap = medicines.stream()
@@ -357,7 +361,10 @@ public class RecommendationService {
                     }
                 }
             }
-            return fallbackList;
+            if (!fallbackList.isEmpty()) {
+                return fallbackList;
+            }
+            return getActiveOtcCatalogFallback(excludedIds, limit, "BEST_SELLER");
         } catch (Exception e) {
             LOG.warnf("Lỗi khi tra cứu danh sách Best Sellers từ medicine-service: %s", e.getMessage());
             return candidateIds.stream()
@@ -371,6 +378,53 @@ public class RecommendationService {
                             "BEST_SELLER"
                     ))
                     .toList();
+        }
+    }
+
+    /**
+     * Fallback khi recommendation_db chưa có thống kê mua hàng (hoặc trống):
+     * lấy danh sách thuốc không kê đơn (OTC) đang hoạt động từ medicine-service.
+     * Bỏ qua êm và trả mảng rỗng nếu medicine-service chưa sẵn sàng.
+     */
+    private List<RecommendationResponse> getActiveOtcCatalogFallback(
+            Set<String> excludedIds,
+            int limit,
+            String reason
+    ) {
+        try {
+            int fetchSize = Math.min(50, Math.max(limit + (excludedIds != null ? excludedIds.size() : 0) + 5, 20));
+            MedicineCatalogPageResponse page = medicineServiceClient.getMedicinesByType("OTC", false, 0, fetchSize);
+            if (page == null || page.items() == null || page.items().isEmpty()) {
+                return List.of();
+            }
+
+            List<RecommendationResponse> results = new ArrayList<>();
+            for (MedicineResponse med : page.items()) {
+                if (med == null || med.id() == null || !med.active()) {
+                    continue;
+                }
+                if ("ETC".equalsIgnoreCase(med.prescriptionType())) {
+                    continue;
+                }
+                if (excludedIds != null && excludedIds.contains(med.id())) {
+                    continue;
+                }
+                results.add(new RecommendationResponse(
+                        med.id(),
+                        med.name(),
+                        med.price(),
+                        "OTC",
+                        false,
+                        reason
+                ));
+                if (results.size() >= limit) {
+                    break;
+                }
+            }
+            return results;
+        } catch (Exception e) {
+            LOG.warnf("Không thể lấy danh mục thuốc OTC fallback từ medicine-service (reason=%s): %s", reason, e.getMessage());
+            return List.of();
         }
     }
 

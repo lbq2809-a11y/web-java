@@ -69,6 +69,18 @@ public class PrescriptionResource {
     }
 
     @GET
+    @RolesAllowed({"DUOC_SI", "ADMIN"})
+    @Operation(summary = "Dược sĩ hoặc Admin xem danh sách toàn bộ đơn thuốc hệ thống",
+               description = "Hỗ trợ lọc theo trạng thái (CHO_DUYET, DA_DUYET, TU_CHOI), phân trang và sắp xếp đơn mới nhất lên đầu.")
+    public PrescriptionPageResponse getAllPrescriptions(
+            @QueryParam("status") PrescriptionStatus status,
+            @QueryParam("page") @DefaultValue("0") int page,
+            @QueryParam("size") @DefaultValue("20") int size
+    ) {
+        return prescriptionService.getAllPrescriptions(status, page, size);
+    }
+
+    @GET
     @Path("/my-prescriptions")
     @RolesAllowed("KHACH_HANG")
     @Operation(summary = "Khách hàng xem danh sách đơn thuốc của chính mình",

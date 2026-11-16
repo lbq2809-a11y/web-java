@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <rect width="240" height="240" rx="24" fill="#FEF3C7"/>
+  <rect x="44" y="48" width="152" height="136" rx="18" fill="#FFFFFF" stroke="#F59E0B" stroke-width="3"/>
+  <path d="M68 124H92L104 94L122 148L136 108L148 124H172" stroke="#B45309" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="64" y="192" width="112" height="22" rx="11" fill="#B45309"/>
+  <text x="120" y="207" text-anchor="middle" fill="#FFFFFF" font-family="sans-serif" font-size="11" font-weight="700">TIM MẠCH - ĐƠN (ETC)</text>
+</svg>

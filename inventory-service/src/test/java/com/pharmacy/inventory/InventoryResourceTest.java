@@ -1,6 +1,7 @@
 package com.pharmacy.inventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pharmacy.inventory.client.MedicinePagedResponse;
 import com.pharmacy.inventory.client.MedicineResponse;
 import com.pharmacy.inventory.client.MedicineServiceClient;
 import com.pharmacy.inventory.dto.CreateBatchRequest;
@@ -25,6 +26,7 @@ import com.pharmacy.inventory.repository.StockAlertRepository;
 import com.pharmacy.inventory.repository.StockMovementRepository;
 import com.pharmacy.inventory.repository.StockReservationRepository;
 import com.pharmacy.inventory.service.AlertScheduler;
+import com.pharmacy.inventory.service.InventoryDataInitializer;
 import com.pharmacy.inventory.service.InventoryReservationService;
 import com.pharmacy.inventory.service.OutboxScheduler;
 import io.quarkus.test.InjectMock;
@@ -133,6 +135,9 @@ public class InventoryResourceTest {
 
     @Inject
     AlertScheduler alertScheduler;
+
+    @Inject
+    InventoryDataInitializer inventoryDataInitializer;
 
     @Inject
     ObjectMapper objectMapper;
@@ -615,6 +620,14 @@ public class InventoryResourceTest {
                 .post("/api/v1/stocks/adjust")
                 .then()
                 .statusCode(403);
+
+        // Khách vãng lai (không JWT) vẫn xem được tồn kho thuốc và kiểm tra tồn -> 200
+        given()
+                .when()
+                .get("/api/v1/stocks/" + MED_A)
+                .then()
+                .statusCode(200)
+                .body("medicineId", equalTo(MED_A));
     }
 
     // -------------------------------------------------------------------------
@@ -634,6 +647,66 @@ public class InventoryResourceTest {
         // Kiểm tra toàn bộ đã chuyển sang SENT
         long remainingPending = outboxRepository.count("status = ?1", OutboxStatus.PENDING);
         assertEquals(0, remainingPending, "Toàn bộ event outbox đã được gửi thành công");
+    }
+
+    // -------------------------------------------------------------------------
+    // Test 13: Tự động khởi tạo lô hàng mẫu khi chưa có tồn kho & bỏ qua thuốc đã có tồn
+    // -------------------------------------------------------------------------
+    @Test
+    @Order(13)
+    public void testInventoryDataInitializerSeedsAndSkipsExisting() {
+        String medSeedNew = "6ad23be6c034632667baaa91";
+        long existingMedAAvailable = batchRepository.sumAvailableQuantity(MED_A, LocalDate.now());
+        assertTrue(existingMedAAvailable > 0, "MED_A phải đã có tồn kho từ các test trước");
+
+        MedicineResponse mNew = new MedicineResponse();
+        mNew.id = medSeedNew;
+        mNew.code = "ACEMUC-200";
+        mNew.name = "Acemuc 200mg";
+        mNew.price = new BigDecimal("65000.00");
+        mNew.active = true;
+
+        MedicineResponse mExisting = new MedicineResponse();
+        mExisting.id = MED_A;
+        mExisting.code = "MED-A";
+        mExisting.name = "Thuốc A";
+        mExisting.price = new BigDecimal("50000.00");
+        mExisting.active = true;
+
+        MedicinePagedResponse page0 = new MedicinePagedResponse();
+        page0.items = List.of(mNew, mExisting);
+        page0.page = 0;
+        page0.size = 50;
+        page0.totalItems = 2;
+        page0.totalPages = 1;
+
+        Mockito.when(medicineServiceClient.getMedicines(0, 50, false)).thenReturn(page0);
+
+        // Chạy lần 1: tạo 1-2 lô cho medSeedNew, giữ nguyên MED_A
+        assertTrue(inventoryDataInitializer.seedInitialStock());
+
+        List<Batch> seededBatches = batchRepository.findByMedicineId(medSeedNew);
+        assertTrue(seededBatches.size() >= 1 && seededBatches.size() <= 2,
+                "Phải tạo 1-2 lô cho thuốc chưa có tồn kho");
+        for (Batch batch : seededBatches) {
+            assertTrue(batch.expiryDate.getYear() >= 2027 && batch.expiryDate.getYear() <= 2028,
+                    "Hạn sử dụng lô mẫu phải nằm trong năm 2027-2028");
+            assertTrue(batch.quantityIn >= 50 && batch.quantityIn <= 150,
+                    "Số lượng mỗi lô mẫu phải từ 50 đến 150");
+            assertEquals(batch.quantityIn, batch.quantityAvailable);
+        }
+        assertEquals(existingMedAAvailable, batchRepository.sumAvailableQuantity(MED_A, LocalDate.now()),
+                "Không được seed trùng thêm cho thuốc đã có tồn kho khả dụng");
+
+        // Chạy lần 2: idempotent, không tạo thêm lô
+        assertTrue(inventoryDataInitializer.seedInitialStock());
+        assertEquals(seededBatches.size(), batchRepository.findByMedicineId(medSeedNew).size());
+
+        // Khi medicine-service chưa bật (throw exception): bỏ qua êm, không ném ngoại lệ
+        Mockito.when(medicineServiceClient.getMedicines(0, 50, false))
+                .thenThrow(new RuntimeException("Connection refused: medicine-service unavailable"));
+        assertTrue(!inventoryDataInitializer.seedInitialStock(),
+                "Phải trả về false an toàn khi medicine-service chưa sẵn sàng");
     }
 }
 
