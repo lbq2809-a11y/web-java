@@ -1,0 +1,35 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Thông báo trạng thái đơn hàng</title>
+</head>
+<body style="margin:0;padding:25px;background:#f4f6f9;font-family:Arial,sans-serif;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;">
+        <div style="background:#2563eb;color:white;padding:25px;text-align:center;">
+            <h1>PHARMACY</h1>
+            <h2>Cập nhật đơn hàng</h2>
+        </div>
+
+        <div style="padding:30px;color:#333;">
+            <h3>Xin chào {customerName}!</h3>
+
+            <p>Đơn hàng của bạn vừa được cập nhật trạng thái.</p>
+
+            <div style="background:#eff6ff;padding:20px;border-radius:8px;">
+                <p><strong>Mã đơn hàng:</strong> {orderId}</p>
+                <p><strong>Trạng thái:</strong> {status}</p>
+                <p><strong>Chi tiết:</strong> {statusDescription}</p>
+            </div>
+
+            <p>Cảm ơn bạn đã tin tưởng Pharmacy.</p>
+            <p>Trân trọng,<br><strong>Đội ngũ Pharmacy</strong></p>
+        </div>
+
+        <div style="background:#f1f5f9;padding:15px;text-align:center;color:#777;font-size:12px;">
+            Email tự động từ hệ thống Pharmacy.
+        </div>
+    </div>
+</body>
+</html>
