@@ -75,6 +75,18 @@ public class OrderResource {
     }
 
     @GET
+    @RolesAllowed({"DUOC_SI", "ADMIN"})
+    @Operation(summary = "Dược sĩ hoặc Admin xem danh sách toàn bộ đơn hàng hệ thống (phân trang)",
+               description = "Hỗ trợ lọc theo trạng thái (CHO_XU_LY, DANG_GIAO, HOAN_THANH, DA_HUY, HOAN_TRA), sắp xếp đơn mới nhất lên đầu.")
+    public OrderPageResponse getAllOrders(
+            @QueryParam("status") OrderStatus status,
+            @QueryParam("page") @DefaultValue("0") int page,
+            @QueryParam("size") @DefaultValue("20") int size
+    ) {
+        return orderService.getAllOrders(status, page, size);
+    }
+
+    @GET
     @Path("/my-orders")
     @RolesAllowed("KHACH_HANG")
     @Operation(summary = "Khách hàng xem danh sách đơn hàng của chính mình (phân trang)",

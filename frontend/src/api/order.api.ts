@@ -9,6 +9,7 @@ import type {
   OrderStatus,
   OrderStatusHistoryResponse,
   UpdateCartItemRequest,
+  UpdateOrderStatusRequest,
 } from '@/types/order.types';
 
 export const orderApi = {
@@ -88,6 +89,32 @@ export const orderApi = {
       `/v1/orders/${id}/cancel`,
       payload,
     );
+    return response.data;
+  },
+
+  async getAllOrders(params: {
+    status?: OrderStatus | '';
+    page?: number;
+    size?: number;
+  }): Promise<OrderPageResponse> {
+    const query: Record<string, string | number> = {
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+    };
+    if (params.status) {
+      query.status = params.status;
+    }
+    const response = await httpClient.get<OrderPageResponse>('/v1/orders', {
+      params: query,
+    });
+    return response.data;
+  },
+
+  async updateOrderStatus(
+    id: string,
+    payload: UpdateOrderStatusRequest,
+  ): Promise<OrderResponse> {
+    const response = await httpClient.put<OrderResponse>(`/v1/orders/${id}/status`, payload);
     return response.data;
   },
 };

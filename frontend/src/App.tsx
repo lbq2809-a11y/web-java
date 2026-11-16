@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { RoleRoute } from '@/components/auth/RoleRoute';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
@@ -11,6 +12,8 @@ import { CartPage } from '@/pages/CartPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { OrdersPage } from '@/pages/OrdersPage';
 import { OrderDetailPage } from '@/pages/OrderDetailPage';
+import { PrescriptionsPage } from '@/pages/PrescriptionsPage';
+import { AdminDashboardPage } from '@/pages/AdminDashboardPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export function App() {
@@ -47,6 +50,24 @@ export function App() {
           <ProtectedRoute>
             <OrderDetailPage />
           </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/prescriptions"
+        element={
+          <RoleRoute allowedRoles={['KHACH_HANG']} redirectTo="/admin" silentRedirect>
+            <PrescriptionsPage />
+          </RoleRoute>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <RoleRoute allowedRoles={['DUOC_SI', 'ADMIN']}>
+            <AdminDashboardPage />
+          </RoleRoute>
         }
       />
 

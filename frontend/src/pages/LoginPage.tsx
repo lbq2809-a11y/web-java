@@ -8,10 +8,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeApiError } from '@/api/httpClient';
+import type { Role } from '@/types/auth.types';
 
 interface LoginLocationState {
   from?: string;
   sessionExpired?: boolean;
+}
+
+const CUSTOMER_ONLY_PATHS = ['/prescriptions', '/cart', '/checkout', '/orders'];
+
+function resolvePostLoginDestination(role: Role, from?: string): string {
+  const cleanFrom = from?.split('?')[0];
+  if (role === 'DUOC_SI' || role === 'ADMIN') {
+    const isCustomerOnlyOrRoot =
+      !from ||
+      cleanFrom === '/' ||
+      CUSTOMER_ONLY_PATHS.some(
+        (path) => cleanFrom === path || cleanFrom?.startsWith(`${path}/`),
+      );
+    return isCustomerOnlyOrRoot ? '/admin' : from;
+  }
+
+  if (!from || cleanFrom === '/admin' || cleanFrom?.startsWith('/admin/')) {
+    return '/';
+  }
+  return from;
 }
 
 export function LoginPage() {
@@ -19,8 +40,6 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state as LoginLocationState | null) ?? null;
-
-  const redirectTo = state?.from || '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,8 +72,9 @@ export function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login({ email: email.trim(), password });
-      navigate(redirectTo, { replace: true });
+      const loggedInUser = await login({ email: email.trim(), password });
+      const destination = resolvePostLoginDestination(loggedInUser.role, state?.from);
+      navigate(destination, { replace: true });
     } catch (err) {
       const normalized = normalizeApiError(err);
       setServerError(normalized.message || 'Email hoặc mật khẩu không chính xác');

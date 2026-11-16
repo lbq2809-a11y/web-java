@@ -96,6 +96,11 @@ export interface CancelOrderRequest {
   reason: string;
 }
 
+export interface UpdateOrderStatusRequest {
+  newStatus: OrderStatus;
+  reason: string;
+}
+
 export interface OrderStatusHistoryResponse {
   id: string;
   oldStatus: string | null;

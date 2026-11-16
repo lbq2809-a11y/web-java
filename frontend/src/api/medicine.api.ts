@@ -2,6 +2,7 @@ import { httpClient } from './httpClient';
 import type { PagedResponse } from '@/types/common.types';
 import type {
   CategoryResponse,
+  MedicineRequest,
   MedicineResponse,
   MedicineSearchParams,
 } from '@/types/medicine.types';
@@ -15,7 +16,7 @@ export const medicineApi = {
       size: params.size ?? 12,
       sortBy: params.sortBy ?? 'name',
       sortDir: params.sortDir ?? 'asc',
-      includeInactive: false,
+      includeInactive: params.includeInactive ?? false,
     };
 
     if (params.keyword && params.keyword.trim().length > 0) {
@@ -42,5 +43,19 @@ export const medicineApi = {
   async listCategories(): Promise<CategoryResponse[]> {
     const response = await httpClient.get<CategoryResponse[]>('/v1/categories');
     return response.data;
+  },
+
+  async createMedicine(payload: MedicineRequest): Promise<MedicineResponse> {
+    const response = await httpClient.post<MedicineResponse>('/v1/medicines', payload);
+    return response.data;
+  },
+
+  async updateMedicine(id: string, payload: MedicineRequest): Promise<MedicineResponse> {
+    const response = await httpClient.put<MedicineResponse>(`/v1/medicines/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteMedicine(id: string): Promise<void> {
+    await httpClient.delete(`/v1/medicines/${id}`);
   },
 };

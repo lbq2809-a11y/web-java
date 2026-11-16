@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
   Cross,
+  FileText,
   LogOut,
   Menu,
   MessageSquareHeart,
   Pill,
+  ShieldCheck,
   ShoppingCart,
   User as UserIcon,
   X,
@@ -19,15 +21,32 @@ import { cn, translateRole } from '@/lib/utils';
 export function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const { totalItems } = useCart();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const closeMobile = () => setMobileOpen(false);
+
+  const handleLogout = () => {
+    closeMobile();
+    logout();
+    navigate('/login', { replace: true, state: null });
+  };
+
+  const isCustomer = isAuthenticated && user?.role === 'KHACH_HANG';
+  const isStaff =
+    isAuthenticated && (user?.role === 'DUOC_SI' || user?.role === 'ADMIN');
 
   const navLinks = [
     { to: '/', label: 'Trang chủ', end: true },
     { to: '/medicines', label: 'Danh mục thuốc', end: false },
     { to: '/consultation', label: 'Tư vấn AI', end: false },
-    ...(isAuthenticated ? [{ to: '/orders', label: 'Đơn hàng', end: false }] : []),
+    ...(isCustomer
+      ? [
+          { to: '/prescriptions', label: 'Đơn thuốc', end: false },
+          { to: '/orders', label: 'Đơn hàng', end: false },
+        ]
+      : []),
+    ...(isStaff ? [{ to: '/admin', label: 'Kênh Dược sĩ', end: false }] : []),
   ];
 
   return (
@@ -66,7 +85,9 @@ export function Navbar() {
             >
               {item.to === '/medicines' && <Pill className="h-4 w-4" />}
               {item.to === '/consultation' && <MessageSquareHeart className="h-4 w-4" />}
+              {item.to === '/prescriptions' && <FileText className="h-4 w-4" />}
               {item.to === '/orders' && <ClipboardList className="h-4 w-4" />}
+              {item.to === '/admin' && <ShieldCheck className="h-4 w-4 text-[#0F766E]" />}
               {item.label}
             </NavLink>
           ))}
@@ -108,7 +129,7 @@ export function Navbar() {
                     </span>
                   </div>
                 </Link>
-                <Button variant="outline" size="sm" onClick={logout} title="Đăng xuất">
+                <Button variant="outline" size="sm" onClick={handleLogout} title="Đăng xuất">
                   <LogOut className="h-4 w-4" />
                   <span>Đăng xuất</span>
                 </Button>
@@ -182,10 +203,7 @@ export function Navbar() {
                 <Button
                   variant="outline"
                   className="w-full justify-center"
-                  onClick={() => {
-                    closeMobile();
-                    logout();
-                  }}
+                  onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4" />
                   Đăng xuất

@@ -61,5 +61,25 @@ public class PrescriptionRepository implements PanacheRepositoryBase<Prescriptio
     public long countPending() {
         return count("status = ?1", PrescriptionStatus.CHO_DUYET);
     }
+
+    /**
+     * Lấy danh sách toàn bộ đơn thuốc hệ thống cho Dược sĩ/Admin (hỗ trợ lọc trạng thái, mới nhất lên đầu)
+     */
+    public List<Prescription> findAllPrescriptions(PrescriptionStatus status, int page, int size) {
+        PanacheQuery<Prescription> query = (status != null)
+                ? find("status = ?1", Sort.by("createdAt").descending(), status)
+                : findAll(Sort.by("createdAt").descending());
+        return query.page(Page.of(page, size)).list();
+    }
+
+    /**
+     * Đếm tổng số đơn thuốc theo bộ lọc trạng thái
+     */
+    public long countAllPrescriptions(PrescriptionStatus status) {
+        if (status != null) {
+            return count("status = ?1", status);
+        }
+        return count();
+    }
 }
 

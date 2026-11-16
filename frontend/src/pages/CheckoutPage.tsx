@@ -17,9 +17,10 @@ import { MedicineBadge } from '@/components/medicine/MedicineBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { useCheckoutMutation } from '@/hooks/useOrders';
+import { useMyPrescriptionsQuery } from '@/hooks/usePrescriptions';
 import { useToast } from '@/hooks/useToast';
 import { normalizeApiError } from '@/api/httpClient';
-import { formatCurrencyVnd } from '@/lib/utils';
+import { formatCurrencyVnd, formatDateTimeVi } from '@/lib/utils';
 
 // Regex số điện thoại di động Việt Nam theo đúng Bean Validation của order-service
 const VIETNAM_PHONE_REGEX = /^(0[3|5|7|8|9])+([0-9]{8})$/;
@@ -53,6 +54,27 @@ export function CheckoutPage() {
   }, [user]);
 
   const isNotCustomerRole = Boolean(user && user.role !== 'KHACH_HANG');
+
+  const approvedPrescriptionsQuery = useMyPrescriptionsQuery(
+    { status: 'DA_DUYET', page: 0, size: 50 },
+    hasEtcItems && !isNotCustomerRole,
+  );
+
+  const validApprovedPrescriptions = (
+    approvedPrescriptionsQuery.data?.items ?? []
+  ).filter(
+    (p) => !p.expiresAt || new Date(p.expiresAt).getTime() > Date.now(),
+  );
+
+  useEffect(() => {
+    if (
+      hasEtcItems &&
+      !prescriptionId &&
+      validApprovedPrescriptions.length > 0
+    ) {
+      setPrescriptionId(validApprovedPrescriptions[0].id);
+    }
+  }, [hasEtcItems, prescriptionId, validApprovedPrescriptions]);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -319,9 +341,83 @@ export function CheckoutPage() {
                       Xác thực đơn thuốc cho thuốc kê đơn (ETC)
                     </h2>
                     <p className="mt-1 text-xs leading-relaxed text-[#B45309]">
-                      Đơn hàng của bạn có thuốc thuộc danh mục kê đơn. Vui lòng nhập mã đơn thuốc (UUID) đã được dược sĩ duyệt trên hệ thống để xác nhận hợp lệ.
+                      Đơn hàng của bạn có thuốc thuộc danh mục kê đơn. Hãy chọn đơn thuốc đã được dược sĩ duyệt bên dưới hoặc nhập mã đơn thuốc (UUID).
                     </p>
                   </div>
+                </div>
+
+                {/* Danh sách đơn thuốc đã duyệt của khách hàng */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-[#0F172A]">
+                      Chọn đơn thuốc đã được duyệt ({validApprovedPrescriptions.length})
+                    </span>
+                    <Link
+                      to="/prescriptions"
+                      className="text-xs font-semibold text-[#0F766E] underline hover:text-[#115E59]"
+                    >
+                      Quản lý / Tải đơn thuốc mới →
+                    </Link>
+                  </div>
+
+                  {approvedPrescriptionsQuery.isLoading ? (
+                    <div className="rounded-lg border border-[#E2E8F0] bg-white p-3 text-xs text-[#475569]">
+                      Đang tải danh sách đơn thuốc đã duyệt...
+                    </div>
+                  ) : validApprovedPrescriptions.length > 0 ? (
+                    <div className="space-y-2">
+                      <select
+                        value={
+                          validApprovedPrescriptions.some((p) => p.id === prescriptionId)
+                            ? prescriptionId
+                            : ''
+                        }
+                        onChange={(e) => setPrescriptionId(e.target.value)}
+                        className="h-10 w-full rounded-lg border border-[#E2E8F0] bg-white px-3 text-xs text-[#0F172A] focus:border-[#0F766E] focus:outline-none"
+                      >
+                        <option value="">-- Chọn đơn thuốc đã duyệt hoặc tự nhập UUID bên dưới --</option>
+                        {validApprovedPrescriptions.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            #{p.id.slice(0, 8).toUpperCase()} — Duyệt{' '}
+                            {p.items.map((it) => `${it.medicineName} (×${it.maxAllowedQuantity})`).join(', ') || 'theo toa'}
+                            {p.expiresAt ? ` • HSD: ${formatDateTimeVi(p.expiresAt)}` : ''}
+                          </option>
+                        ))}
+                      </select>
+
+                      {validApprovedPrescriptions
+                        .filter((p) => p.id === prescriptionId)
+                        .map((selected) => (
+                          <div
+                            key={selected.id}
+                            className="rounded-lg border border-[#CCFBF1] bg-[#F0FDFA] p-3 text-xs text-[#0F766E]"
+                          >
+                            <p className="font-semibold">
+                              Đơn #{selected.id.slice(0, 8).toUpperCase()} đã được chọn:
+                            </p>
+                            {selected.items.length > 0 && (
+                              <p className="mt-1">
+                                Thuốc được duyệt:{' '}
+                                {selected.items
+                                  .map((it) => `${it.medicineName} (tối đa ${it.maxAllowedQuantity})`)
+                                  .join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-[#F59E0B]/50 bg-white p-3 text-xs text-[#0F172A]">
+                      Bạn chưa có đơn thuốc nào ở trạng thái Đã duyệt còn hiệu lực.{' '}
+                      <Link
+                        to="/prescriptions"
+                        className="font-semibold text-[#0F766E] underline"
+                      >
+                        Tải lên ảnh đơn thuốc tại đây
+                      </Link>{' '}
+                      hoặc nhập mã UUID thủ công nếu đã có.
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

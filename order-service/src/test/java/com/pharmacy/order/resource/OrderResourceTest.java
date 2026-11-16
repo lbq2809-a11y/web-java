@@ -920,5 +920,50 @@ public class OrderResourceTest {
         org.junit.jupiter.api.Assertions.assertTrue(processedEventRepo.isEventProcessed(completedEventId));
         org.junit.jupiter.api.Assertions.assertTrue(processedEventRepo.isEventProcessed(failedEventId));
     }
+
+    // =========================================================================================
+    // Ca 16: Phân quyền & Lọc danh sách toàn bộ đơn hàng (GET /api/v1/orders) cho DUOC_SI/ADMIN
+    // =========================================================================================
+    @Test
+    @Order(16)
+    void testCase16_AdminAndPharmacistGetAllOrders_RbacAndFiltering() {
+        String tokenCustomer = generateToken(CUSTOMER_A_ID, "KHACH_HANG", "Nguyễn Văn A");
+        String tokenPharmacist = generateToken(PHARMACIST_ID, "DUOC_SI", "DS. Trần Dược");
+        String tokenAdmin = generateToken(ADMIN_ID, "ADMIN", "Quản trị viên");
+
+        // Khách hàng bị chặn 403 Forbidden
+        given()
+                .header("Authorization", "Bearer " + tokenCustomer)
+                .when()
+                .get("/api/v1/orders")
+                .then()
+                .statusCode(403);
+
+        // Chưa đăng nhập bị chặn 401
+        given()
+                .when()
+                .get("/api/v1/orders")
+                .then()
+                .statusCode(401);
+
+        // Dược sĩ xem toàn bộ đơn hàng -> 200 OK
+        given()
+                .header("Authorization", "Bearer " + tokenPharmacist)
+                .when()
+                .get("/api/v1/orders?page=0&size=20")
+                .then()
+                .statusCode(200)
+                .body("totalElements", greaterThanOrEqualTo(1))
+                .body("items", org.hamcrest.Matchers.not(empty()));
+
+        // Admin lọc theo trạng thái DA_HUY -> 200 OK
+        given()
+                .header("Authorization", "Bearer " + tokenAdmin)
+                .when()
+                .get("/api/v1/orders?status=DA_HUY&page=0&size=10")
+                .then()
+                .statusCode(200)
+                .body("items[0].status", equalTo("DA_HUY"));
+    }
 }
 

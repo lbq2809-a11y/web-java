@@ -476,4 +476,42 @@ public class PrescriptionResourceTest {
                 .statusCode(409)
                 .body("code", equalTo("PRESCRIPTION_ALREADY_USED"));
     }
+
+    // =========================================================================================
+    // Ca 12: Phân quyền & Lọc danh sách toàn bộ đơn thuốc (GET /api/v1/prescriptions) cho DUOC_SI/ADMIN
+    // =========================================================================================
+    @Test
+    @Order(12)
+    void testCase12_AdminAndPharmacistGetAllPrescriptions_RbacAndFiltering() {
+        String tokenCustomer = generateToken(CUSTOMER_A_ID, "KHACH_HANG", "Nguyễn Văn A");
+        String tokenPharmacist = generateToken(PHARMACIST_ID, "DUOC_SI", "DS. Trần Thị Dược");
+        String tokenAdmin = generateToken(ADMIN_ID, "ADMIN", "Quản trị viên");
+
+        // Khách hàng bị chặn 403 Forbidden
+        given()
+                .header("Authorization", "Bearer " + tokenCustomer)
+                .when()
+                .get("/api/v1/prescriptions")
+                .then()
+                .statusCode(403);
+
+        // Dược sĩ xem toàn bộ đơn thuốc -> 200 OK
+        given()
+                .header("Authorization", "Bearer " + tokenPharmacist)
+                .when()
+                .get("/api/v1/prescriptions?page=0&size=20")
+                .then()
+                .statusCode(200)
+                .body("totalElements", greaterThanOrEqualTo(1))
+                .body("items", org.hamcrest.Matchers.not(empty()));
+
+        // Admin lọc theo trạng thái DA_DUYET -> 200 OK
+        given()
+                .header("Authorization", "Bearer " + tokenAdmin)
+                .when()
+                .get("/api/v1/prescriptions?status=DA_DUYET&page=0&size=10")
+                .then()
+                .statusCode(200)
+                .body("items[0].status", equalTo("DA_DUYET"));
+    }
 }

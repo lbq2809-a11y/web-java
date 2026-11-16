@@ -32,10 +32,27 @@ export interface CategoryResponse {
   updatedAt: string;
 }
 
+export interface MedicineRequest {
+  code: string;
+  name: string;
+  activeIngredient: string;
+  manufacturer: string;
+  unit: string;
+  price: number;
+  imageUrl?: string;
+  indications: string;
+  contraindications: string;
+  dosage: string;
+  prescriptionType: PrescriptionType;
+  categoryId: string;
+  active: boolean;
+}
+
 export interface MedicineSearchParams {
   keyword?: string;
   categoryId?: string;
   prescriptionType?: PrescriptionType | '';
+  includeInactive?: boolean;
   page?: number;
   size?: number;
   sortBy?: string;

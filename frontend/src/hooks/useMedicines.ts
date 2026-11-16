@@ -1,6 +1,6 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { medicineApi } from '@/api/medicine.api';
-import type { MedicineSearchParams } from '@/types/medicine.types';
+import type { MedicineRequest, MedicineSearchParams } from '@/types/medicine.types';
 
 export function useCategoriesQuery() {
   return useQuery({
@@ -25,5 +25,40 @@ export function useMedicineDetailQuery(id: string | undefined) {
     queryFn: () => medicineApi.getMedicineById(id!),
     enabled: Boolean(id),
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useCreateMedicineMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: MedicineRequest) => medicineApi.createMedicine(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medicines'] });
+    },
+  });
+}
+
+export function useUpdateMedicineMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: MedicineRequest }) =>
+      medicineApi.updateMedicine(id, payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['medicines'] });
+      queryClient.invalidateQueries({ queryKey: ['medicine', variables.id] });
+    },
+  });
+}
+
+export function useDeleteMedicineMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => medicineApi.deleteMedicine(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medicines'] });
+    },
   });
 }

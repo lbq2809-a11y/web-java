@@ -311,6 +311,22 @@ public class OrderService {
     }
 
     /**
+     * Dược sĩ và Admin xem danh sách toàn bộ đơn hàng hệ thống (phân trang, lọc theo trạng thái)
+     */
+    @Transactional
+    public OrderPageResponse getAllOrders(OrderStatus status, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = (size > 0 && size <= 100) ? size : 20;
+
+        List<Order> list = orderRepo.findAllOrders(status, safePage, safeSize);
+        long total = orderRepo.countAllOrders(status);
+        int totalPages = (int) Math.ceil((double) total / safeSize);
+
+        List<OrderResponse> responses = list.stream().map(mapper::toOrderResponse).toList();
+        return new OrderPageResponse(responses, safePage, safeSize, total, totalPages);
+    }
+
+    /**
      * Xem thông tin chi tiết một đơn hàng:
      * - DUOC_SI và ADMIN xem được mọi đơn hàng
      * - KHACH_HANG chỉ xem được đơn hàng của chính mình
