@@ -1,5 +1,6 @@
 package com.pharmacy.recommendation.client;
 
+import com.pharmacy.recommendation.dto.MedicineCatalogPageResponse;
 import com.pharmacy.recommendation.dto.MedicineResponse;
 import com.pharmacy.recommendation.dto.PagedResponse;
 import jakarta.ws.rs.Consumes;
@@ -47,6 +48,17 @@ public interface MedicineServiceClient {
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)
     PagedResponse<MedicineResponse> getMedicinesByCategory(
             @QueryParam("categoryId") String categoryId,
+            @QueryParam("page") int page,
+            @QueryParam("size") int size
+    );
+
+    @GET
+    @Timeout(value = 3, unit = ChronoUnit.SECONDS)
+    @Retry(maxRetries = 2, delay = 200, delayUnit = ChronoUnit.MILLIS)
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000)
+    MedicineCatalogPageResponse getMedicinesByType(
+            @QueryParam("prescriptionType") String prescriptionType,
+            @QueryParam("includeInactive") boolean includeInactive,
             @QueryParam("page") int page,
             @QueryParam("size") int size
     );

@@ -1,29 +1,34 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import {
+  ClipboardList,
   Cross,
   LogOut,
   Menu,
   MessageSquareHeart,
   Pill,
+  ShoppingCart,
   User as UserIcon,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
 import { cn, translateRole } from '@/lib/utils';
 
-const navLinks = [
-  { to: '/', label: 'Trang chủ', end: true },
-  { to: '/medicines', label: 'Danh mục thuốc', end: false },
-  { to: '/consultation', label: 'Tư vấn AI', end: false },
-];
-
 export function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
+  const { totalItems } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const closeMobile = () => setMobileOpen(false);
+
+  const navLinks = [
+    { to: '/', label: 'Trang chủ', end: true },
+    { to: '/medicines', label: 'Danh mục thuốc', end: false },
+    { to: '/consultation', label: 'Tư vấn AI', end: false },
+    ...(isAuthenticated ? [{ to: '/orders', label: 'Đơn hàng', end: false }] : []),
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-sm">
@@ -37,7 +42,7 @@ export function Navbar() {
             <span className="text-base font-bold tracking-tight text-[#0F172A]">
               An Tâm Pharmacy
             </span>
-            <span className="text-[11px] font-medium text-[#475569]">
+            <span className="hidden text-[11px] font-medium text-[#475569] sm:block">
               Nhà thuốc trực tuyến & Tư vấn Dược AI
             </span>
           </div>
@@ -52,7 +57,7 @@ export function Navbar() {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  'rounded-lg px-3.5 py-2 text-sm font-medium transition-colors flex items-center gap-1.5',
+                  'rounded-lg px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1.5',
                   isActive
                     ? 'bg-[#F0FDFA] text-[#0F766E] border border-[#CCFBF1]'
                     : 'text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A] border border-transparent',
@@ -61,58 +66,76 @@ export function Navbar() {
             >
               {item.to === '/medicines' && <Pill className="h-4 w-4" />}
               {item.to === '/consultation' && <MessageSquareHeart className="h-4 w-4" />}
+              {item.to === '/orders' && <ClipboardList className="h-4 w-4" />}
               {item.label}
             </NavLink>
           ))}
         </nav>
 
-        {/* Cụm tài khoản Desktop */}
-        <div className="hidden items-center gap-2.5 md:flex">
-          {isAuthenticated && user ? (
-            <>
-              <Link
-                to="/profile"
-                className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-1.5 text-sm transition-colors hover:border-[#0F766E]/40 hover:bg-[#F0FDFA]"
-              >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0F766E] text-xs font-semibold text-white">
-                  {(user.fullName || user.email).charAt(0).toUpperCase()}
-                </span>
-                <div className="flex flex-col leading-none">
-                  <span className="max-w-[140px] truncate text-xs font-semibold text-[#0F172A]">
-                    {user.fullName || user.email}
-                  </span>
-                  <span className="mt-0.5 text-[10px] text-[#475569]">
-                    {translateRole(user.role)}
-                  </span>
-                </div>
-              </Link>
-              <Button variant="outline" size="sm" onClick={logout} title="Đăng xuất">
-                <LogOut className="h-4 w-4" />
-                <span>Đăng xuất</span>
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/login">Đăng nhập</Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link to="/register">Đăng ký</Link>
-              </Button>
-            </>
-          )}
-        </div>
+        {/* Cụm Giỏ hàng & Tài khoản */}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/cart"
+            onClick={closeMobile}
+            aria-label={`Giỏ hàng (${totalItems} sản phẩm)`}
+            className="relative inline-flex h-10 items-center gap-1.5 rounded-lg border border-[#E2E8F0] bg-white px-3 text-sm font-medium text-[#0F172A] transition-colors hover:border-[#0F766E]/50 hover:bg-[#F0FDFA]"
+          >
+            <ShoppingCart className="h-4 w-4 text-[#0F766E]" />
+            <span className="hidden sm:inline">Giỏ hàng</span>
+            {totalItems > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#0F766E] px-1.5 font-mono text-[11px] font-bold text-white">
+                {totalItems > 99 ? '99+' : totalItems}
+              </span>
+            )}
+          </Link>
 
-        {/* Nút mở menu Mobile */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen((prev) => !prev)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#0F172A] hover:bg-[#F8FAFC] md:hidden cursor-pointer"
-          aria-label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+          <div className="hidden items-center gap-2 md:flex">
+            {isAuthenticated && user ? (
+              <>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-1.5 text-sm transition-colors hover:border-[#0F766E]/40 hover:bg-[#F0FDFA]"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0F766E] text-xs font-semibold text-white">
+                    {(user.fullName || user.email).charAt(0).toUpperCase()}
+                  </span>
+                  <div className="flex flex-col leading-none">
+                    <span className="max-w-[130px] truncate text-xs font-semibold text-[#0F172A]">
+                      {user.fullName || user.email}
+                    </span>
+                    <span className="mt-0.5 text-[10px] text-[#475569]">
+                      {translateRole(user.role)}
+                    </span>
+                  </div>
+                </Link>
+                <Button variant="outline" size="sm" onClick={logout} title="Đăng xuất">
+                  <LogOut className="h-4 w-4" />
+                  <span>Đăng xuất</span>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/login">Đăng nhập</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link to="/register">Đăng ký</Link>
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Nút mở menu Mobile */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((prev) => !prev)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white text-[#0F172A] hover:bg-[#F8FAFC] md:hidden cursor-pointer"
+            aria-label={mobileOpen ? 'Đóng menu' : 'Mở menu'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Menu Drawer cho Mobile */}

@@ -1,6 +1,6 @@
 # Frontend — Hệ Thống Nhà Thuốc Trực Tuyến & Tư Vấn Dược AI
 
-Ứng dụng giao diện người dùng (Lần 1) xây dựng bằng **React + Vite + TypeScript (Strict Mode)**, **Tailwind CSS**, **TanStack Query**, **Axios** và **React Router**, thiết kế theo phong cách **Soft Medical UI**.
+Ứng dụng giao diện người dùng (Lần 1 + Lần 2) xây dựng bằng **React + Vite + TypeScript (Strict Mode)**, **Tailwind CSS**, **TanStack Query**, **Axios** và **React Router**, thiết kế theo phong cách **Soft Medical UI**.
 
 ---
 
@@ -40,24 +40,30 @@ VITE_API_BASE_URL=/api
 
 Trong `vite.config.ts`, các lời gọi bắt đầu bằng `/api` được chuyển tiếp như sau:
 
-1. **`/api/v1/consultations` $\rightarrow$ `http://localhost:8088` *(Cấu hình tạm thời)***:
-   * Hiện tại `api-gateway` (cổng `8080`) chưa khai báo route chuyển tiếp tới `consultation-service` (`8088`). Do đó Vite dev server tạm thời proxy trực tiếp `/api/v1/consultations` sang cổng `8088` để tính năng Tư vấn AI hoạt động trơn tru mà không gặp lỗi CORS ở trình duyệt.
-   * Sau này khi `api-gateway` bổ sung route cho `consultation-service`, chỉ cần gỡ rule `/api/v1/consultations` khỏi `vite.config.ts`.
-2. **`/api` (các route còn lại như `auth`, `medicines`, `categories`) $\rightarrow$ `http://localhost:8080`**:
-   * Đi tập trung qua `api-gateway` (`8080`), gateway sẽ định tuyến tới `auth-service` (`8082`) và `medicine-service` (`8081`).
+1. **`/api/v1/stocks` $\rightarrow$ `http://localhost:8087` *(Cấu hình tạm thời)***
+2. **`/api/v1/consultations` $\rightarrow$ `http://localhost:8088` *(Cấu hình tạm thời)***
+3. **`/api/v1/recommendations` $\rightarrow$ `http://localhost:8089` *(Cấu hình tạm thời)***
+   * Hiện tại `api-gateway` (cổng `8080`) chỉ định tuyến nhóm dịch vụ cốt lõi (`auth`, `medicine`, `prescription`, `order`, `payment`, `notification`) và chưa khai báo route cho 3 service Nhóm 2 (`inventory-service`, `consultation-service`, `recommendation-service`). Vite dev server tạm thời proxy trực tiếp 3 prefix trên để frontend chạy thông suốt không lỗi CORS.
+   * Khi `api-gateway` bổ sung các route này, chỉ cần gỡ 3 rule tạm trong `vite.config.ts`.
+4. **`/api` (các route còn lại như `auth`, `medicines`, `categories`, `cart`, `orders`, `prescriptions`) $\rightarrow$ `http://localhost:8080`**:
+   * Đi tập trung qua `api-gateway` (`8080`).
 
 ---
 
-## 3. Các Backend Services cần bật để chạy đầy đủ Lần 1
+## 3. Các Backend Services cần bật để chạy đầy đủ
 
-Trước khi chạy giao diện, đảm bảo hạ tầng Docker (`docker compose up -d`) và 4 microservice Quarkus sau đang hoạt động:
+Trước khi chạy giao diện, đảm bảo hạ tầng Docker (`docker compose up -d`) và các microservice Quarkus sau đang hoạt động:
 
 | Service | Cổng | Vai trò | Lệnh chạy |
 | :--- | :---: | :--- | :--- |
-| `api-gateway` | `8080` | Cổng điều phối API cho Auth & Medicine | `cd api-gateway && ./mvnw quarkus:dev` |
+| `api-gateway` | `8080` | Cổng điều phối API cho Auth, Medicine, Prescription, Order | `cd api-gateway && ./mvnw quarkus:dev` |
 | `medicine-service` | `8081` | Danh mục thuốc (OTC/ETC) & chi tiết thuốc | `cd medicine-service && ./mvnw quarkus:dev` |
 | `auth-service` | `8082` | Đăng ký, Đăng nhập JWT RS256, `/auth/me` | `cd auth-service && ./mvnw quarkus:dev` |
+| `prescription-service` | `8083` | Xác thực đơn thuốc (khi Checkout đơn có thuốc ETC) | `cd prescription-service && ./mvnw quarkus:dev` |
+| `order-service` | `8084` | Giỏ hàng Redis (`/api/v1/cart`), Đặt hàng & Lịch sử đơn (`/api/v1/orders`) | `cd order-service && ./mvnw quarkus:dev` |
+| `inventory-service` | `8087` | Kiểm tra tồn kho khả dụng theo lô FEFO | `cd inventory-service && ./mvnw quarkus:dev` |
 | `consultation-service` | `8088` | Trợ lý Tư vấn AI 2 tầng & lịch sử hội thoại | `cd consultation-service && ./mvnw quarkus:dev` |
+| `recommendation-service` | `8089` | Gợi ý mua kèm (`also-bought`) & cá nhân hóa (`for-me`) | `cd recommendation-service && ./mvnw quarkus:dev` |
 
 ---
 

@@ -94,11 +94,12 @@ httpClient.interceptors.response.use(
     const status = error.response?.status;
     const requestUrl = error.config?.url ?? '';
 
-    // Bỏ qua xử lý redirect 401 cho endpoint đăng nhập/đăng ký để giữ nguyên thông báo lỗi sai mật khẩu trên form
+    // Bỏ qua xử lý redirect 401 cho endpoint đăng nhập/đăng ký và API tra cứu tồn kho công khai
     const isAuthAttemptEndpoint =
       requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+    const isPublicStockCheck = requestUrl.includes('/v1/stocks');
 
-    if (status === 401 && !isAuthAttemptEndpoint) {
+    if (status === 401 && !isAuthAttemptEndpoint && !isPublicStockCheck) {
       authStorage.clear();
       if (unauthorizedHandler) {
         unauthorizedHandler();

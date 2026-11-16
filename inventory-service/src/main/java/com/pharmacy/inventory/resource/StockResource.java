@@ -9,6 +9,7 @@ import com.pharmacy.inventory.dto.StockCheckResponse;
 import com.pharmacy.inventory.dto.StockResponse;
 import com.pharmacy.inventory.dto.StockSummaryResponse;
 import com.pharmacy.inventory.service.InventoryService;
+import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -44,7 +45,8 @@ public class StockResource {
 
     @GET
     @Path("/{medicineId}")
-    @Operation(summary = "Xem tổng tồn khả dụng và chi tiết các lô của 1 loại thuốc")
+    @PermitAll
+    @Operation(summary = "Xem tổng tồn khả dụng và chi tiết các lô của 1 loại thuốc (Công khai cho storefront kiểm tra còn hàng)")
     public StockResponse getStockByMedicineId(@PathParam("medicineId") String medicineId) {
         return inventoryService.getStockByMedicineId(medicineId);
     }
@@ -69,7 +71,8 @@ public class StockResource {
 
     @POST
     @Path("/check")
-    @Operation(summary = "Kiểm tra tồn kho cho danh sách mặt hàng (API nội bộ)")
+    @PermitAll
+    @Operation(summary = "Kiểm tra tồn kho cho danh sách mặt hàng (API nội bộ & kiểm tra trước khi đặt hàng)")
     public StockCheckResponse checkStock(@Valid StockCheckRequest request) {
         return inventoryService.checkStock(request);
     }

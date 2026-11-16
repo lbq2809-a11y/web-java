@@ -2,6 +2,7 @@ package com.pharmacy.recommendation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pharmacy.recommendation.client.MedicineServiceClient;
+import com.pharmacy.recommendation.dto.MedicineCatalogPageResponse;
 import com.pharmacy.recommendation.dto.MedicineResponse;
 import com.pharmacy.recommendation.dto.OrderCreatedEvent;
 import com.pharmacy.recommendation.dto.OrderItemDto;
@@ -576,5 +577,83 @@ public class RecommendationResourceTest {
                 .get("/api/v1/recommendations/for-me")
                 .then()
                 .statusCode(401);
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("14. Fallback danh mục OTC từ medicine-service khi recommendation_db chưa có lịch sử đơn hàng")
+    void testEmptyDatabaseFallbacksToMedicineCatalog() {
+        String userId = UUID.randomUUID().toString();
+        String token = generateToken(userId, "KHACH_HANG");
+
+        MedicineResponse resPanadol = new MedicineResponse(
+                MED_PANADOL, "MED-002", "Panadol Extra", "Paracetamol", "GSK", "Hộp",
+                BigDecimal.valueOf(55000), null, null, null, null, "OTC", "cat-1", "Giảm đau", true, 5.0, 1, Instant.now(), Instant.now()
+        );
+        MedicineResponse resVitC = new MedicineResponse(
+                MED_VITAMIN_C, "MED-003", "Vitamin C", "Vit C", "DHG", "Hộp",
+                BigDecimal.valueOf(45000), null, null, null, null, "OTC", "cat-1", "Vitamin", true, 5.0, 1, Instant.now(), Instant.now()
+        );
+        MedicineResponse resAugmentin = new MedicineResponse(
+                MED_AUGMENTIN, "MED-005", "Augmentin 1g", "Amox", "GSK", "Hộp",
+                BigDecimal.valueOf(285000), null, null, null, null, "ETC", "cat-2", "Kháng sinh", true, 5.0, 1, Instant.now(), Instant.now()
+        );
+        MedicineResponse resInactive = new MedicineResponse(
+                MED_INACTIVE, "MED-099", "Thuốc Ngừng Bán", "X", "Y", "Hộp",
+                BigDecimal.valueOf(15000), null, null, null, null, "OTC", "cat-1", "Khác", false, 0.0, 0, Instant.now(), Instant.now()
+        );
+
+        when(medicineServiceClient.getMedicinesByType(eq("OTC"), eq(false), eq(0), anyInt()))
+                .thenReturn(new MedicineCatalogPageResponse(
+                        List.of(resPanadol, resAugmentin, resVitC, resInactive), 0, 20, 4, 1
+                ));
+
+        // 1. /for-me khi DB rỗng -> fallback thuốc OTC active, reason = BEST_SELLER, loại bỏ ETC & inactive
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when()
+                .get("/api/v1/recommendations/for-me?limit=5")
+                .then()
+                .statusCode(200)
+                .contentType(ContentType.JSON)
+                .body("size()", equalTo(2))
+                .body("[0].medicineId", equalTo(MED_PANADOL))
+                .body("[0].type", equalTo("OTC"))
+                .body("[0].requiresPrescription", equalTo(false))
+                .body("[0].reason", equalTo("BEST_SELLER"))
+                .body("[1].medicineId", equalTo(MED_VITAMIN_C))
+                .body("[1].reason", equalTo("BEST_SELLER"));
+
+        // 2. /also-bought/{MED_PANADOL} khi DB rỗng -> fallback thuốc OTC active (loại trừ MED_PANADOL), reason = FREQUENTLY_BOUGHT_TOGETHER
+        given()
+                .when()
+                .get("/api/v1/recommendations/also-bought/" + MED_PANADOL + "?limit=5")
+                .then()
+                .statusCode(200)
+                .contentType(ContentType.JSON)
+                .body("size()", equalTo(1))
+                .body("[0].medicineId", equalTo(MED_VITAMIN_C))
+                .body("[0].type", equalTo("OTC"))
+                .body("[0].requiresPrescription", equalTo(false))
+                .body("[0].reason", equalTo("FREQUENTLY_BOUGHT_TOGETHER"));
+
+        // 3. Khi medicine-service chưa bật -> bỏ qua êm, trả [] 200 OK
+        when(medicineServiceClient.getMedicinesByType(eq("OTC"), eq(false), eq(0), anyInt()))
+                .thenThrow(new RuntimeException("Connection refused: medicine-service unavailable"));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when()
+                .get("/api/v1/recommendations/for-me?limit=5")
+                .then()
+                .statusCode(200)
+                .body("size()", equalTo(0));
+
+        given()
+                .when()
+                .get("/api/v1/recommendations/also-bought/" + MED_PANADOL + "?limit=5")
+                .then()
+                .statusCode(200)
+                .body("size()", equalTo(0));
     }
 }

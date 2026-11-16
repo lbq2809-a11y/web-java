@@ -10,8 +10,11 @@ import {
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { useMedicinesQuery } from '@/hooks/useMedicines';
+import { useAuth } from '@/hooks/useAuth';
+import { useForMeRecommendationsQuery } from '@/hooks/useRecommendations';
 import { MedicineCard } from '@/components/medicine/MedicineCard';
 import { MedicineGridSkeleton } from '@/components/medicine/MedicineSkeleton';
+import { RecommendationSection } from '@/components/recommendation/RecommendationSection';
 
 const CLINICAL_PILLARS = [
   {
@@ -35,12 +38,14 @@ const CLINICAL_PILLARS = [
 ];
 
 export function HomePage() {
+  const { isAuthenticated } = useAuth();
   const { data, isLoading, isError } = useMedicinesQuery({
     page: 0,
     size: 6,
     sortBy: 'name',
     sortDir: 'asc',
   });
+  const forMeQuery = useForMeRecommendationsQuery(isAuthenticated, 4);
 
   return (
     <AppShell>
@@ -192,6 +197,18 @@ export function HomePage() {
           </div>
         )}
       </section>
+
+      {/* Gợi ý dành riêng cho bạn (chỉ hiển thị khi đã đăng nhập) */}
+      {isAuthenticated && (
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+          <RecommendationSection
+            title="Gợi ý dành riêng cho bạn"
+            subtitle="Tổng hợp dựa trên lịch sử mua hàng và nhóm sản phẩm thường quan tâm của bạn"
+            items={forMeQuery.data ?? []}
+            isLoading={forMeQuery.isLoading}
+          />
+        </section>
+      )}
     </AppShell>
   );
 }

@@ -7,16 +7,24 @@ import {
   ClipboardList,
   FlaskConical,
   MessageSquareHeart,
+  Minus,
   Package,
   Pill,
+  Plus,
   ShieldAlert,
+  ShoppingCart,
   Star,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { MedicineBadge } from '@/components/medicine/MedicineBadge';
+import { StockStatusBadge } from '@/components/medicine/StockStatusBadge';
 import { MedicineDetailSkeleton } from '@/components/medicine/MedicineSkeleton';
+import { RecommendationSection } from '@/components/recommendation/RecommendationSection';
 import { useMedicineDetailQuery } from '@/hooks/useMedicines';
+import { useMedicineStockQuery } from '@/hooks/useInventory';
+import { useAlsoBoughtQuery } from '@/hooks/useRecommendations';
+import { useCart } from '@/hooks/useCart';
 import { cn, formatCurrencyVnd } from '@/lib/utils';
 import { normalizeApiError } from '@/api/httpClient';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -26,7 +34,13 @@ const FALLBACK_MEDICINE_IMAGE = '/images/medicines/default-medicine.svg';
 export function MedicineDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: medicine, isLoading, isError, error } = useMedicineDetailQuery(id);
+  const stockQuery = useMedicineStockQuery(id);
+  const alsoBoughtQuery = useAlsoBoughtQuery(id, 4);
+  const { addItem, getItemQuantity } = useCart();
+
   const [imgSrc, setImgSrc] = useState<string>(FALLBACK_MEDICINE_IMAGE);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [isAdding, setIsAdding] = useState<boolean>(false);
 
   useEffect(() => {
     if (medicine?.imageUrl && medicine.imageUrl.trim().length > 0) {
@@ -35,6 +49,10 @@ export function MedicineDetailPage() {
       setImgSrc(FALLBACK_MEDICINE_IMAGE);
     }
   }, [medicine?.imageUrl]);
+
+  useEffect(() => {
+    setQuantity(1);
+  }, [id]);
 
   if (isLoading) {
     return (
@@ -131,6 +149,11 @@ export function MedicineDetailPage() {
           <div className="flex flex-col md:col-span-7">
             <div className="flex flex-wrap items-center gap-2">
               <MedicineBadge type={medicine.prescriptionType} />
+              <StockStatusBadge
+                totalAvailable={stockQuery.data?.totalAvailable}
+                isLoading={stockQuery.isLoading}
+                isError={stockQuery.isError}
+              />
               {medicine.categoryName && (
                 <span className="rounded-full border border-[#E2E8F0] bg-[#F8FAFC] px-2.5 py-0.5 text-xs font-medium text-[#475569]">
                   {medicine.categoryName}
@@ -183,15 +206,94 @@ export function MedicineDetailPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button asChild>
-                <Link
-                  to={`/consultation?q=${encodeURIComponent(`Thuốc ${medicine.name} có công dụng và cách dùng như thế nào?`)}`}
-                >
-                  <MessageSquareHeart className="h-4 w-4" />
-                  <span>Hỏi Trợ lý AI về thuốc này</span>
-                </Link>
-              </Button>
+            <div className="mt-6 space-y-4">
+              {(() => {
+                const totalAvailable = stockQuery.data?.totalAvailable ?? null;
+                const currentInCart = getItemQuantity(medicine.id);
+                const maxCanAdd =
+                  totalAvailable !== null
+                    ? Math.max(0, totalAvailable - currentInCart)
+                    : 99;
+                const isOutOfStock = totalAvailable !== null && totalAvailable <= 0;
+                const isAtCartLimit = totalAvailable !== null && maxCanAdd <= 0;
+
+                const handleAddToCart = async () => {
+                  if (isOutOfStock || isAtCartLimit) return;
+                  setIsAdding(true);
+                  try {
+                    await addItem(
+                      {
+                        medicineId: medicine.id,
+                        medicineName: medicine.name,
+                        unit: medicine.unit,
+                        price: medicine.price,
+                        imageUrl: medicine.imageUrl,
+                        prescriptionType: medicine.prescriptionType,
+                        quantity,
+                      },
+                      totalAvailable,
+                    );
+                  } finally {
+                    setIsAdding(false);
+                  }
+                };
+
+                return (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="inline-flex h-10 items-center rounded-lg border border-[#E2E8F0] bg-[#F8FAFC]">
+                      <button
+                        type="button"
+                        aria-label="Giảm số lượng"
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        disabled={isOutOfStock || quantity <= 1}
+                        className="flex h-full w-9 items-center justify-center text-[#475569] hover:text-[#0F172A] disabled:opacity-40"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="min-w-10 text-center font-mono text-sm font-semibold text-[#0F172A]">
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Tăng số lượng"
+                        onClick={() =>
+                          setQuantity((q) =>
+                            Math.min(maxCanAdd > 0 ? maxCanAdd : 1, q + 1),
+                          )
+                        }
+                        disabled={isOutOfStock || quantity >= Math.max(1, maxCanAdd)}
+                        className="flex h-full w-9 items-center justify-center text-[#475569] hover:text-[#0F172A] disabled:opacity-40"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={() => void handleAddToCart()}
+                      disabled={isOutOfStock || isAtCartLimit || isAdding}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      <span>
+                        {isOutOfStock
+                          ? 'Hết hàng'
+                          : isAtCartLimit
+                            ? 'Đã đạt giới hạn tồn kho trong giỏ'
+                            : 'Thêm vào giỏ'}
+                      </span>
+                    </Button>
+
+                    <Button asChild variant="outline">
+                      <Link
+                        to={`/consultation?q=${encodeURIComponent(`Thuốc ${medicine.name} có công dụng và cách dùng như thế nào?`)}`}
+                      >
+                        <MessageSquareHeart className="h-4 w-4" />
+                        <span>Hỏi Trợ lý AI về thuốc này</span>
+                      </Link>
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -227,6 +329,16 @@ export function MedicineDetailPage() {
               {medicine.dosage || 'Tham khảo tờ hướng dẫn sử dụng hoặc ý kiến bác sĩ/dược sĩ.'}
             </p>
           </section>
+        </div>
+
+        {/* Gợi ý thường được mua cùng */}
+        <div className="mt-10 border-t border-[#E2E8F0] pt-8">
+          <RecommendationSection
+            title="Thường được mua cùng"
+            subtitle="Thống kê các sản phẩm thường đi kèm trong đơn hàng tại nhà thuốc"
+            items={alsoBoughtQuery.data ?? []}
+            isLoading={alsoBoughtQuery.isLoading}
+          />
         </div>
       </div>
     </AppShell>
