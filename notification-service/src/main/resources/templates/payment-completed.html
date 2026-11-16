@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Xác nhận thanh toán</title>
+</head>
+<body style="margin:0;padding:25px;background:#f4f6f9;font-family:Arial,sans-serif;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;">
+        <div style="background:#198754;color:white;padding:25px;text-align:center;">
+            <h1>PHARMACY</h1>
+            <h2>Thanh toán thành công</h2>
+        </div>
+
+        <div style="padding:30px;color:#333;">
+            <h3>Xin chào {customerName}!</h3>
+
+            <p>Hệ thống đã ghi nhận thanh toán thành công của bạn.</p>
+
+            <div style="background:#f0fdf4;padding:20px;border-radius:8px;">
+                <p><strong>Mã đơn hàng:</strong> {orderId}</p>
+                <p><strong>Số tiền:</strong> {amount} VNĐ</p>
+                <p><strong>Mã giao dịch:</strong> {transactionId}</p>
+                <p><strong>Phương thức:</strong> {paymentMethod}</p>
+            </div>
+
+            <p>Cảm ơn bạn đã mua hàng tại Pharmacy.</p>
+            <p>Trân trọng,<br><strong>Đội ngũ Pharmacy</strong></p>
+        </div>
+    </div>
+</body>
+</html>
