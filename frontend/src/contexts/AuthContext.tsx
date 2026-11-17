@@ -12,6 +12,7 @@ import { authApi } from '@/api/auth.api';
 import { registerUnauthorizedHandler } from '@/api/httpClient';
 import { authStorage } from '@/lib/storage';
 import type {
+  AuthResponse,
   LoginRequest,
   RegisterRequest,
   UserResponse,
@@ -24,6 +25,7 @@ export interface AuthContextValue {
   isInitializing: boolean;
   login: (payload: LoginRequest) => Promise<UserResponse>;
   register: (payload: RegisterRequest) => Promise<UserResponse>;
+  completeAuthSession: (authRes: AuthResponse) => UserResponse;
   logout: () => void;
   refreshProfile: () => Promise<UserResponse>;
 }
@@ -95,8 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (payload: LoginRequest): Promise<UserResponse> => {
-    const authRes = await authApi.login(payload);
+  const applyAuthSession = useCallback((authRes: AuthResponse): UserResponse => {
     authStorage.setToken(authRes.accessToken);
     authStorage.setUser(authRes.user);
     setToken(authRes.accessToken);
@@ -104,14 +105,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authRes.user;
   }, []);
 
-  const register = useCallback(async (payload: RegisterRequest): Promise<UserResponse> => {
-    const authRes = await authApi.register(payload);
-    authStorage.setToken(authRes.accessToken);
-    authStorage.setUser(authRes.user);
-    setToken(authRes.accessToken);
-    setUser(authRes.user);
-    return authRes.user;
-  }, []);
+  const login = useCallback(
+    async (payload: LoginRequest): Promise<UserResponse> => {
+      const authRes = await authApi.login(payload);
+      return applyAuthSession(authRes);
+    },
+    [applyAuthSession],
+  );
+
+  const register = useCallback(
+    async (payload: RegisterRequest): Promise<UserResponse> => {
+      const authRes = await authApi.register(payload);
+      return applyAuthSession(authRes);
+    },
+    [applyAuthSession],
+  );
 
   const logout = useCallback(() => {
     clearSession();
@@ -133,10 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isInitializing,
       login,
       register,
+      completeAuthSession: applyAuthSession,
       logout,
       refreshProfile,
     }),
-    [user, token, isInitializing, login, register, logout, refreshProfile],
+    [user, token, isInitializing, login, register, applyAuthSession, logout, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

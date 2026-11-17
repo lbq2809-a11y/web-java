@@ -3,6 +3,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RoleRoute } from '@/components/auth/RoleRoute';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
+import { QrConfirmPage } from '@/pages/QrConfirmPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { MedicinesPage } from '@/pages/MedicinesPage';
@@ -21,6 +22,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/qr-confirm" element={<QrConfirmPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/medicines" element={<MedicinesPage />} />
       <Route path="/medicines/:id" element={<MedicineDetailPage />} />

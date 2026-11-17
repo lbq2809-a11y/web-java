@@ -28,3 +28,30 @@ export interface RegisterRequest {
   fullName: string;
   phone?: string;
 }
+
+export type QrSessionStatus = 'PENDING' | 'CONFIRMED';
+
+export interface CreateQrSessionResponse {
+  sessionId: string;
+  pollSecret: string;
+  qrContent: string;
+  status: QrSessionStatus;
+  expiresAt: string;
+}
+
+export interface QrSessionStatusResponse {
+  sessionId: string;
+  status: QrSessionStatus;
+  accessToken?: string;
+  tokenType?: string;
+  expiresIn?: number;
+  user?: UserResponse;
+}
+
+export interface ConfirmQrRequest {
+  sessionId: string;
+}
+
+export interface ConfirmQrResponse {
+  status: QrSessionStatus;
+}
