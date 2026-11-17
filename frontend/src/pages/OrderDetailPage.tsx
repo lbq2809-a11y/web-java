@@ -3,11 +3,15 @@ import { Link, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
+  CheckCircle2,
   Clock,
+  CreditCard,
+  ExternalLink,
   FileText,
   Loader2,
   MapPin,
   Package,
+  QrCode,
   XCircle,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
@@ -18,23 +22,44 @@ import {
   OrderStatusBadge,
   translateOrderStatus,
 } from '@/components/order/OrderStatusBadge';
+import { ConfirmManualPaymentModal } from '@/components/payment/ConfirmManualPaymentModal';
+import {
+  PaymentStatusBadge,
+  translatePaymentMethod,
+} from '@/components/payment/PaymentStatusBadge';
+import { QrPaymentBox } from '@/components/payment/QrPaymentBox';
+import { useAuth } from '@/hooks/useAuth';
 import {
   useCancelOrderMutation,
   useOrderDetailQuery,
   useOrderHistoryQuery,
 } from '@/hooks/useOrders';
+import {
+  useConfirmCodPaymentMutation,
+  useConfirmQrPaymentMutation,
+  useCreatePaymentMutation,
+  usePaymentByOrderIdQuery,
+} from '@/hooks/usePayments';
 import { useToast } from '@/hooks/useToast';
 import { normalizeApiError } from '@/api/httpClient';
 import { formatCurrencyVnd, formatDateTimeVi } from '@/lib/utils';
+import type { PaymentMethod } from '@/types/payment.types';
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const { showToast } = useToast();
 
   const orderQuery = useOrderDetailQuery(id);
   const historyQuery = useOrderHistoryQuery(id);
+  const paymentQuery = usePaymentByOrderIdQuery(id);
   const cancelMutation = useCancelOrderMutation();
+  const createPaymentMutation = useCreatePaymentMutation();
+  const confirmCodMutation = useConfirmCodPaymentMutation();
+  const confirmQrMutation = useConfirmQrPaymentMutation();
 
+  const [selectedPayMethod, setSelectedPayMethod] = useState<PaymentMethod>('COD');
+  const [isConfirmPaymentModalOpen, setIsConfirmPaymentModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -97,6 +122,58 @@ export function OrderDetailPage() {
 
   const order = orderQuery.data;
   const history = historyQuery.data ?? [];
+  const payment = paymentQuery.data;
+  const isStaff = user?.role === 'DUOC_SI' || user?.role === 'ADMIN';
+
+  const handleCreatePayment = async () => {
+    if (!id) return;
+    try {
+      await createPaymentMutation.mutateAsync({
+        orderId: id,
+        method: selectedPayMethod,
+      });
+      showToast({
+        title: 'Đã khởi tạo thanh toán',
+        description: `Phương thức: ${translatePaymentMethod(selectedPayMethod)}`,
+        variant: 'success',
+      });
+    } catch (error) {
+      showToast({
+        title: 'Không thể khởi tạo thanh toán',
+        description: normalizeApiError(error).message,
+        variant: 'error',
+      });
+    }
+  };
+
+  const isConfirmingPayment =
+    confirmCodMutation.isPending || confirmQrMutation.isPending;
+
+  const handleConfirmManualPayment = async () => {
+    if (!payment) return;
+    const isQr = payment.method === 'QR';
+    try {
+      if (isQr) {
+        await confirmQrMutation.mutateAsync(payment.id);
+      } else {
+        await confirmCodMutation.mutateAsync(payment.id);
+      }
+      showToast({
+        title: isQr ? 'Đã xác nhận đã nhận tiền QR' : 'Đã xác nhận thu tiền COD',
+        description: `Giao dịch #${payment.id.slice(0, 8)} đã hoàn tất.`,
+        variant: 'success',
+      });
+      setIsConfirmPaymentModalOpen(false);
+    } catch (error) {
+      showToast({
+        title: isQr
+          ? 'Không thể xác nhận thanh toán QR'
+          : 'Không thể xác nhận thu tiền COD',
+        description: normalizeApiError(error).message,
+        variant: 'error',
+      });
+    }
+  };
 
   return (
     <AppShell>
@@ -250,8 +327,127 @@ export function OrderDetailPage() {
             </section>
           </div>
 
-          {/* Cột phải: Địa chỉ & Đơn thuốc */}
+          {/* Cột phải: Thanh toán, Địa chỉ & Đơn thuốc */}
           <aside className="space-y-6">
+            <section className="space-y-3 rounded-xl border border-[#E2E8F0] bg-white p-5">
+              <div className="flex items-center justify-between gap-2 border-b border-[#E2E8F0] pb-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-[#0F766E]" />
+                  <h2 className="text-base font-bold text-[#0F172A]">
+                    Thông tin thanh toán
+                  </h2>
+                </div>
+                {payment && <PaymentStatusBadge status={payment.status} />}
+              </div>
+
+              {paymentQuery.isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : payment ? (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-xs text-[#475569]">Phương thức</span>
+                    <span className="font-semibold text-[#0F172A]">
+                      {translatePaymentMethod(payment.method)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-xs text-[#475569]">Số tiền</span>
+                    <span className="font-mono font-bold text-[#0F766E]">
+                      {formatCurrencyVnd(payment.amount)}
+                    </span>
+                  </div>
+                  {payment.externalTransactionId && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-xs text-[#475569]">Mã tham chiếu</span>
+                      <span className="font-mono text-xs font-semibold text-[#0F172A]">
+                        {payment.externalTransactionId}
+                      </span>
+                    </div>
+                  )}
+
+                  {payment.method === 'QR' && payment.qrContent && (
+                    <QrPaymentBox qrContent={payment.qrContent} />
+                  )}
+
+                  {payment.method === 'VNPAY' &&
+                    payment.redirectUrl &&
+                    payment.status === 'PENDING' && (
+                      <Button asChild className="w-full" size="sm">
+                        <a
+                          href={payment.redirectUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span>Thanh toán ngay qua VNPay</span>
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    )}
+
+                  {isStaff &&
+                    payment.status === 'PENDING' &&
+                    (payment.method === 'COD' || payment.method === 'QR') && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setIsConfirmPaymentModalOpen(true)}
+                        disabled={isConfirmingPayment}
+                      >
+                        {isConfirmingPayment ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : payment.method === 'QR' ? (
+                          <QrCode className="h-4 w-4" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        <span>
+                          {payment.method === 'QR'
+                            ? 'Xác nhận đã nhận tiền QR'
+                            : 'Xác nhận đã thu tiền COD'}
+                        </span>
+                      </Button>
+                    )}
+                </div>
+              ) : (
+                <div className="space-y-3 text-xs">
+                  <p className="text-[#475569]">
+                    Đơn hàng này chưa có giao dịch thanh toán.
+                  </p>
+                  {order.status !== 'DA_HUY' && order.status !== 'HOAN_TRA' && (
+                    <div className="space-y-2">
+                      <select
+                        value={selectedPayMethod}
+                        onChange={(e) =>
+                          setSelectedPayMethod(e.target.value as PaymentMethod)
+                        }
+                        className="h-9 w-full rounded-lg border border-[#E2E8F0] bg-white px-2.5 text-xs text-[#0F172A]"
+                      >
+                        <option value="COD">Thanh toán khi nhận hàng (COD)</option>
+                        <option value="QR">Chuyển khoản mã QR</option>
+                        <option value="VNPAY">Cổng thanh toán VNPay</option>
+                      </select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => void handleCreatePayment()}
+                        disabled={createPaymentMutation.isPending}
+                      >
+                        {createPaymentMutation.isPending && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                        <span>Tạo giao dịch thanh toán</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
             <section className="space-y-3 rounded-xl border border-[#E2E8F0] bg-white p-5">
               <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-3">
                 <MapPin className="h-5 w-5 text-[#0F766E]" />
@@ -345,6 +541,13 @@ export function OrderDetailPage() {
           </div>
         </div>
       )}
+      {/* Modal xác nhận thu tiền COD / QR */}
+      <ConfirmManualPaymentModal
+        payment={isConfirmPaymentModalOpen ? (payment ?? null) : null}
+        isPending={isConfirmingPayment}
+        onClose={() => setIsConfirmPaymentModalOpen(false)}
+        onConfirm={() => void handleConfirmManualPayment()}
+      />
     </AppShell>
   );
 }

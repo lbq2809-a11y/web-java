@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Banknote,
   CheckCircle2,
   Eye,
   Loader2,
   Package,
+  QrCode,
   Truck,
   XCircle,
 } from 'lucide-react';
@@ -14,14 +16,25 @@ import {
   OrderStatusBadge,
   translateOrderStatus,
 } from '@/components/order/OrderStatusBadge';
+import { ConfirmManualPaymentModal } from '@/components/payment/ConfirmManualPaymentModal';
+import {
+  PaymentStatusBadge,
+  translatePaymentMethod,
+} from '@/components/payment/PaymentStatusBadge';
 import {
   useAllOrdersQuery,
   useUpdateOrderStatusMutation,
 } from '@/hooks/useOrders';
+import {
+  useConfirmCodPaymentMutation,
+  useConfirmQrPaymentMutation,
+  usePaymentByOrderIdQuery,
+} from '@/hooks/usePayments';
 import { useToast } from '@/hooks/useToast';
 import { normalizeApiError } from '@/api/httpClient';
 import { formatCurrencyVnd, formatDateTimeVi } from '@/lib/utils';
 import type { OrderResponse, OrderStatus } from '@/types/order.types';
+import type { PaymentResponse } from '@/types/payment.types';
 
 const STATUS_TABS: { value: OrderStatus | ''; label: string }[] = [
   { value: '', label: 'Tất cả' },
@@ -31,6 +44,63 @@ const STATUS_TABS: { value: OrderStatus | ''; label: string }[] = [
   { value: 'DA_HUY', label: 'Đã hủy' },
   { value: 'HOAN_TRA', label: 'Hoàn trả' },
 ];
+
+function OrderPaymentInfoRow({
+  orderId,
+  onRequestConfirmPayment,
+}: {
+  orderId: string;
+  onRequestConfirmPayment: (payment: PaymentResponse) => void;
+}) {
+  const paymentQuery = usePaymentByOrderIdQuery(orderId);
+  const payment = paymentQuery.data;
+
+  if (paymentQuery.isLoading) {
+    return <Skeleton className="h-5 w-48" />;
+  }
+
+  if (!payment) {
+    return (
+      <span className="text-xs text-[#475569]">
+        Thanh toán: <span className="italic">Chưa tạo giao dịch</span>
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-[#475569]">
+        Thanh toán:{' '}
+        <span className="font-semibold text-[#0F172A]">
+          {translatePaymentMethod(payment.method)}
+        </span>
+      </span>
+      <PaymentStatusBadge status={payment.status} />
+      {payment.status === 'PENDING' &&
+        (payment.method === 'COD' || payment.method === 'QR') && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onRequestConfirmPayment(payment)}
+            className="h-7 border-[#0F766E] px-2.5 text-xs text-[#0F766E] hover:bg-[#F0FDFA]"
+          >
+            {payment.method === 'QR' ? (
+              <>
+                <QrCode className="h-3.5 w-3.5" />
+                <span>Xác nhận đã nhận tiền QR</span>
+              </>
+            ) : (
+              <>
+                <Banknote className="h-3.5 w-3.5" />
+                <span>Xác nhận đã thu tiền COD</span>
+              </>
+            )}
+          </Button>
+        )}
+    </div>
+  );
+}
 
 export function AdminOrdersTab() {
   const { showToast } = useToast();
@@ -42,6 +112,8 @@ export function AdminOrdersTab() {
     order: OrderResponse;
     nextStatus: OrderStatus;
   } | null>(null);
+  const [confirmPaymentTarget, setConfirmPaymentTarget] =
+    useState<PaymentResponse | null>(null);
   const [reason, setReason] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -51,6 +123,35 @@ export function AdminOrdersTab() {
     size: 10,
   });
   const updateStatusMutation = useUpdateOrderStatusMutation();
+  const confirmCodMutation = useConfirmCodPaymentMutation();
+  const confirmQrMutation = useConfirmQrPaymentMutation();
+
+  const isConfirmingPayment =
+    confirmCodMutation.isPending || confirmQrMutation.isPending;
+
+  const handleConfirmManualPayment = async () => {
+    if (!confirmPaymentTarget) return;
+    const isQr = confirmPaymentTarget.method === 'QR';
+    try {
+      if (isQr) {
+        await confirmQrMutation.mutateAsync(confirmPaymentTarget.id);
+      } else {
+        await confirmCodMutation.mutateAsync(confirmPaymentTarget.id);
+      }
+      showToast({
+        title: isQr ? 'Đã xác nhận đã nhận tiền QR' : 'Đã xác nhận thu tiền COD',
+        description: `Đơn #${confirmPaymentTarget.orderId.slice(0, 8)} đã chuyển thanh toán sang COMPLETED.`,
+        variant: 'success',
+      });
+      setConfirmPaymentTarget(null);
+    } catch (error) {
+      showToast({
+        title: isQr ? 'Không thể xác nhận thanh toán QR' : 'Không thể xác nhận COD',
+        description: normalizeApiError(error).message,
+        variant: 'error',
+      });
+    }
+  };
 
   const openTransitionModal = (order: OrderResponse, nextStatus: OrderStatus) => {
     setTransitionTarget({ order, nextStatus });
@@ -192,7 +293,13 @@ export function AdminOrdersTab() {
                 ))}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-[#E2E8F0] pt-3">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#E2E8F0] pt-3">
+                <OrderPaymentInfoRow
+                  orderId={order.id}
+                  onRequestConfirmPayment={(payment) => setConfirmPaymentTarget(payment)}
+                />
+
+                <div className="flex flex-wrap items-center gap-2">
                 {order.status === 'CHO_XU_LY' && (
                   <>
                     <Button
@@ -233,6 +340,7 @@ export function AdminOrdersTab() {
                     <span>Chi tiết</span>
                   </Link>
                 </Button>
+                </div>
               </div>
             </article>
           ))}
@@ -313,6 +421,14 @@ export function AdminOrdersTab() {
           </div>
         </div>
       )}
+
+      {/* Modal xác nhận thu tiền COD / QR */}
+      <ConfirmManualPaymentModal
+        payment={confirmPaymentTarget}
+        isPending={isConfirmingPayment}
+        onClose={() => setConfirmPaymentTarget(null)}
+        onConfirm={() => void handleConfirmManualPayment()}
+      />
     </div>
   );
 }

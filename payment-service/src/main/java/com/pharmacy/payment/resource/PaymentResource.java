@@ -71,4 +71,14 @@ public class PaymentResource {
     ) {
         return paymentService.confirmCod(id, correlationId);
     }
+
+    @POST
+    @Path("/{id}/confirm-qr")
+    @RolesAllowed({"ADMIN", "DUOC_SI"})
+    public PaymentResponse confirmQr(
+        @PathParam("id") UUID id,
+        @HeaderParam("X-Correlation-Id") String correlationId
+    ) {
+        return paymentService.confirmQr(id, correlationId);
+    }
 }

@@ -97,6 +97,14 @@ public class PaymentResourceTest {
                 .then()
                 .statusCode(403);
 
+        // Khách hàng tự xác nhận QR -> 403 Forbidden
+        given()
+                .header("Authorization", "Bearer " + customerToken)
+                .when()
+                .post("/api/v1/payments/" + UUID.randomUUID() + "/confirm-qr")
+                .then()
+                .statusCode(403);
+
         // Thiếu dữ liệu bắt buộc -> 400 với ErrorResponse chuẩn JSON
         given()
                 .header("Authorization", "Bearer " + customerToken)
@@ -175,8 +183,9 @@ public class PaymentResourceTest {
 
     @Test
     @Order(3)
-    void testCreateQrPaymentAndPublicVnPayIpnSignatureReject() {
+    void testCreateQrConfirmQrAndPublicVnPayIpnSignatureReject() {
         String customerToken = generateToken(CUSTOMER_ID, "KHACH_HANG");
+        String pharmacistToken = generateToken(PHARMACIST_ID, "DUOC_SI");
         UUID orderId = UUID.randomUUID();
 
         OrderSnapshot snapshot = new OrderSnapshot(
@@ -189,7 +198,7 @@ public class PaymentResourceTest {
         Mockito.when(orderServiceClient.getOrder(eq(orderId), any(), anyString()))
                 .thenReturn(snapshot);
 
-        given()
+        String qrPaymentId = given()
                 .header("Authorization", "Bearer " + customerToken)
                 .contentType(ContentType.JSON)
                 .body(new CreatePaymentRequest(orderId, PaymentMethod.QR))
@@ -199,7 +208,28 @@ public class PaymentResourceTest {
                 .statusCode(200)
                 .body("method", equalTo("QR"))
                 .body("status", equalTo("PENDING"))
-                .body("qrContent", startsWith("PHARMACY-PAYMENT|"));
+                .body("qrContent", startsWith("PHARMACY-PAYMENT|"))
+                .extract().path("id");
+
+        // Không thể gọi confirm-cod cho giao dịch QR -> 409 Conflict
+        given()
+                .header("Authorization", "Bearer " + pharmacistToken)
+                .when()
+                .post("/api/v1/payments/" + qrPaymentId + "/confirm-cod")
+                .then()
+                .statusCode(409);
+
+        // Dược sĩ xác nhận đã nhận tiền QR -> 200 COMPLETED & tạo OutboxEvent
+        given()
+                .header("Authorization", "Bearer " + pharmacistToken)
+                .when()
+                .post("/api/v1/payments/" + qrPaymentId + "/confirm-qr")
+                .then()
+                .statusCode(200)
+                .body("method", equalTo("QR"))
+                .body("status", equalTo("COMPLETED"));
+
+        assertEquals(1L, outboxRepository.count("topic", "payment.completed"));
 
         // Callback VNPay IPN không cần JWT nhưng chữ ký giả bị trả RspCode=97
         given()

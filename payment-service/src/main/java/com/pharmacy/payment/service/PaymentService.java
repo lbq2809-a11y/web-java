@@ -165,14 +165,48 @@ public class PaymentService {
         UUID paymentId,
         String correlationId
     ) {
+        return confirmManualPayment(
+            paymentId,
+            correlationId,
+            PaymentMethod.COD,
+            "Giao dịch này không sử dụng phương thức COD",
+            "COD_CASH_COLLECTED",
+            "Nhân viên xác nhận đã thu tiền COD"
+        );
+    }
+
+    @Transactional
+    public PaymentResponse confirmQr(
+        UUID paymentId,
+        String correlationId
+    ) {
+        return confirmManualPayment(
+            paymentId,
+            correlationId,
+            PaymentMethod.QR,
+            "Giao dịch này không sử dụng phương thức QR",
+            "QR_TRANSFER_CONFIRMED",
+            "Nhân viên xác nhận đã nhận tiền chuyển khoản QR"
+        );
+    }
+
+    // Xử lý chung cho xác nhận thủ công (COD / QR) và phát sự kiện Outbox payment.completed
+    private PaymentResponse confirmManualPayment(
+        UUID paymentId,
+        String correlationId,
+        PaymentMethod expectedMethod,
+        String wrongMethodMessage,
+        String transactionType,
+        String transactionNote
+    ) {
         Payment payment = paymentRepository.findById(paymentId);
 
         if (payment == null) {
             throw error(404, "Không tìm thấy giao dịch thanh toán");
         }
 
-        if (payment.method != PaymentMethod.COD) {
-            throw error(409, "Giao dịch này không sử dụng phương thức COD");
+        if (payment.method != expectedMethod) {
+            throw error(409, wrongMethodMessage);
         }
 
         if (payment.status == PaymentStatus.COMPLETED) {
@@ -187,9 +221,9 @@ public class PaymentService {
 
         recordTransaction(
             payment,
-            "COD_CASH_COLLECTED",
+            transactionType,
             "COMPLETED",
-            "Nhân viên xác nhận đã thu tiền COD"
+            transactionNote
         );
 
         createCompletedOutboxEvent(

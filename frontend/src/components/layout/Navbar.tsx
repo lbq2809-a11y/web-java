@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
+import { NotificationBell } from '@/components/layout/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { cn, translateRole } from '@/lib/utils';
 
@@ -93,8 +94,9 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Cụm Giỏ hàng & Tài khoản */}
+        {/* Cụm Thông báo, Giỏ hàng & Tài khoản */}
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <Link
             to="/cart"
             onClick={closeMobile}
