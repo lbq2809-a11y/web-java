@@ -122,7 +122,7 @@ public class NotificationService {
 
         List<NotificationDocument> unreadNotifications =
                 notificationRepository
-                        .find("userId = ?1 and isRead = false", userId)
+                        .find("userId = ?1 and isRead = ?2", userId, false)
                         .list();
 
         for (NotificationDocument notification : unreadNotifications) {

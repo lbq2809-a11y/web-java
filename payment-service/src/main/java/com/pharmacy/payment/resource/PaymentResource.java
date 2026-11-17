@@ -11,7 +11,6 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.UUID;
 
 @Path("/api/v1/payments")
-@Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class PaymentResource {
 
@@ -19,6 +18,7 @@ public class PaymentResource {
     PaymentService paymentService;
 
     @POST
+    @Consumes(MediaType.APPLICATION_JSON)
     @RolesAllowed({"KHACH_HANG", "DUOC_SI", "ADMIN"})
     public PaymentResponse createPayment(
         @Valid CreatePaymentRequest request,
@@ -49,6 +49,17 @@ public class PaymentResource {
         @HeaderParam("X-Correlation-Id") String correlationId
     ) {
         return paymentService.getPayment(id, authorization, correlationId);
+    }
+
+    @GET
+    @Path("/order/{orderId}")
+    @RolesAllowed({"KHACH_HANG", "DUOC_SI", "ADMIN"})
+    public PaymentResponse getPaymentByOrderId(
+        @PathParam("orderId") UUID orderId,
+        @HeaderParam("Authorization") String authorization,
+        @HeaderParam("X-Correlation-Id") String correlationId
+    ) {
+        return paymentService.getPaymentByOrderId(orderId, authorization, correlationId);
     }
 
     @POST

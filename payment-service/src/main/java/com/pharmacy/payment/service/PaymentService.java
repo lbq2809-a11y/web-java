@@ -5,16 +5,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pharmacy.payment.client.OrderServiceClient;
 import com.pharmacy.payment.dto.*;
 import com.pharmacy.payment.entity.*;
+import com.pharmacy.payment.exception.GlobalExceptionMapper;
 import com.pharmacy.payment.repository.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -128,6 +131,25 @@ public class PaymentService {
         if (payment == null) {
             throw error(404, "Không tìm thấy giao dịch thanh toán");
         }
+
+        orderServiceClient.getOrder(
+            payment.orderId,
+            authorization,
+            normalizeCorrelationId(correlationId)
+        );
+
+        return toResponse(payment, null);
+    }
+
+    public PaymentResponse getPaymentByOrderId(
+        UUID orderId,
+        String authorization,
+        String correlationId
+    ) {
+        validateAuthorization(authorization);
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+            .orElseThrow(() -> error(404, "Chưa có giao dịch thanh toán cho đơn hàng này"));
 
         orderServiceClient.getOrder(
             payment.orderId,
@@ -274,7 +296,14 @@ public class PaymentService {
 
     private WebApplicationException error(int status, String message) {
         return new WebApplicationException(
-            Response.status(status).entity(message).build()
+            Response.status(status)
+                .type(MediaType.APPLICATION_JSON)
+                .entity(new ErrorResponse(
+                    GlobalExceptionMapper.codeForStatus(status),
+                    message,
+                    List.of()
+                ))
+                .build()
         );
     }
 }

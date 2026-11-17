@@ -21,7 +21,7 @@ public class NotificationRepository
     }
 
     public long countUnreadByUserId(String userId) {
-        return count("userId = ?1 and isRead = false", userId);
+        return count("userId = ?1 and isRead = ?2", userId, false);
     }
 
     /**
