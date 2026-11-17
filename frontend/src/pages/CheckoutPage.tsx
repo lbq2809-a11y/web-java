@@ -4,10 +4,13 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
+  Banknote,
   CheckCircle2,
+  CreditCard,
   FileText,
   Loader2,
   MapPin,
+  QrCode,
   ShieldCheck,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
@@ -17,10 +20,38 @@ import { MedicineBadge } from '@/components/medicine/MedicineBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { useCheckoutMutation } from '@/hooks/useOrders';
+import { useCreatePaymentMutation } from '@/hooks/usePayments';
 import { useMyPrescriptionsQuery } from '@/hooks/usePrescriptions';
 import { useToast } from '@/hooks/useToast';
 import { normalizeApiError } from '@/api/httpClient';
 import { formatCurrencyVnd, formatDateTimeVi } from '@/lib/utils';
+import type { PaymentMethod } from '@/types/payment.types';
+
+const PAYMENT_METHODS: {
+  value: PaymentMethod;
+  title: string;
+  description: string;
+  icon: typeof Banknote;
+}[] = [
+  {
+    value: 'COD',
+    title: 'Thanh toán khi nhận hàng (COD)',
+    description: 'Thanh toán tiền mặt trực tiếp cho nhân viên giao hàng.',
+    icon: Banknote,
+  },
+  {
+    value: 'QR',
+    title: 'Chuyển khoản mã QR',
+    description: 'Nhận mã chuyển khoản nhanh kèm nội dung đối soát tự động.',
+    icon: QrCode,
+  },
+  {
+    value: 'VNPAY',
+    title: 'Cổng thanh toán VNPay',
+    description: 'Thanh toán trực tuyến qua ví VNPAY hoặc thẻ ATM/Visa Sandbox.',
+    icon: CreditCard,
+  },
+];
 
 // Regex số điện thoại di động Việt Nam theo đúng Bean Validation của order-service
 const VIETNAM_PHONE_REGEX = /^(0[3|5|7|8|9])+([0-9]{8})$/;
@@ -34,7 +65,9 @@ export function CheckoutPage() {
     useCart();
   const { showToast } = useToast();
   const checkoutMutation = useCheckoutMutation();
+  const createPaymentMutation = useCreatePaymentMutation();
 
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [recipientName, setRecipientName] = useState(user?.fullName ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [addressLine, setAddressLine] = useState('');
@@ -162,12 +195,30 @@ export function CheckoutPage() {
         },
       });
 
+      let paymentInitFailed = false;
+      try {
+        await createPaymentMutation.mutateAsync({
+          orderId: createdOrder.id,
+          method: paymentMethod,
+        });
+      } catch {
+        paymentInitFailed = true;
+      }
+
       await clearCart();
-      showToast({
-        title: 'Đặt hàng thành công',
-        description: `Đơn hàng #${createdOrder.id.slice(0, 8)} đã được tạo và đang chờ xử lý.`,
-        variant: 'success',
-      });
+      if (paymentInitFailed) {
+        showToast({
+          title: 'Đã tạo đơn hàng',
+          description: `Đơn #${createdOrder.id.slice(0, 8)} đã được tạo nhưng chưa khởi tạo được giao dịch thanh toán. Bạn có thể tạo lại ở trang chi tiết đơn.`,
+          variant: 'warning',
+        });
+      } else {
+        showToast({
+          title: 'Đặt hàng & khởi tạo thanh toán thành công',
+          description: `Đơn hàng #${createdOrder.id.slice(0, 8)} đã được tạo và đang chờ xử lý.`,
+          variant: 'success',
+        });
+      }
       navigate(`/orders/${createdOrder.id}`, { replace: true });
     } catch (error) {
       const apiErr = normalizeApiError(error);
@@ -459,6 +510,56 @@ export function CheckoutPage() {
                 </div>
               </section>
             )}
+
+            {/* Chọn phương thức thanh toán */}
+            <section className="space-y-4 rounded-xl border border-[#E2E8F0] bg-white p-6">
+              <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-3">
+                <CreditCard className="h-5 w-5 text-[#0F766E]" />
+                <h2 className="text-base font-bold text-[#0F172A]">
+                  Phương thức thanh toán
+                </h2>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {PAYMENT_METHODS.map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = paymentMethod === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setPaymentMethod(option.value)}
+                      className={`flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-[#0F766E] bg-[#F0FDFA] ring-2 ring-[#0F766E]/20'
+                          : 'border-[#E2E8F0] bg-white hover:border-[#0F766E]/40'
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <Icon
+                          className={`h-5 w-5 ${
+                            isSelected ? 'text-[#0F766E]' : 'text-[#475569]'
+                          }`}
+                        />
+                        <span
+                          className={`h-4 w-4 rounded-full border-2 ${
+                            isSelected
+                              ? 'border-[#0F766E] bg-[#0F766E]'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        />
+                      </div>
+                      <p className="text-sm font-semibold text-[#0F172A]">
+                        {option.title}
+                      </p>
+                      <p className="text-xs leading-relaxed text-[#475569]">
+                        {option.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           </div>
 
           {/* Tóm tắt sản phẩm đặt mua */}
