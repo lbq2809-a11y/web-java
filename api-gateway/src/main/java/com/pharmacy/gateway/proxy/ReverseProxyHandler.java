@@ -97,7 +97,7 @@ public class ReverseProxyHandler {
                 if (origin != null && !origin.isBlank()) {
                     response.putHeader("Access-Control-Allow-Origin", origin)
                         .putHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-                        .putHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, X-Correlation-Id, Accept")
+                        .putHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, X-Correlation-Id, X-QR-Secret, Accept")
                         .putHeader("Access-Control-Expose-Headers", "X-Correlation-Id")
                         .putHeader("Access-Control-Allow-Credentials", "true")
                         .putHeader("Access-Control-Max-Age", "86400");

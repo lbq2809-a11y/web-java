@@ -82,7 +82,8 @@ export const httpClient = axios.create({
 
 httpClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = authStorage.getToken();
-  if (token) {
+  const isPublicQrEndpoint = config.url?.includes('/v1/auth/qr/session') ?? false;
+  if (token && !isPublicQrEndpoint) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (config.data instanceof FormData) {
