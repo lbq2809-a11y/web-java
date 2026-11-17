@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xác nhận đơn hàng</title>
+</head>
+
+<body style="margin:0; padding:20px; background:#f4f6f9;
+             font-family:Arial,sans-serif;">
+
+<div style="max-width:600px; margin:auto; background:white;
+            border-radius:12px; overflow:hidden;">
+
+    <div style="background:#198754; color:white;
+                padding:25px; text-align:center;">
+
+        <h1>PHARMACY</h1>
+        <h2>Xác nhận đơn hàng thành công</h2>
+
+    </div>
+
+    <div style="padding:30px; color:#333;">
+
+        <h3>Xin chào {customerName}!</h3>
+
+        <p>
+            Cảm ơn bạn đã mua hàng tại hệ thống nhà thuốc Pharmacy.
+            Đơn hàng của bạn đã được tiếp nhận.
+        </p>
+
+        <div style="background:#f1f5f9;
+                    padding:15px; border-radius:8px;">
+
+            <p><strong>Mã đơn hàng:</strong> {orderId}</p>
+
+            <p><strong>Trạng thái:</strong> {status}</p>
+
+            <p>
+                <strong>Tổng tiền:</strong>
+                {totalAmount} VNĐ
+            </p>
+
+        </div>
+
+        <h3>Chi tiết sản phẩm</h3>
+
+        <table style="width:100%; border-collapse:collapse;">
+
+            <thead>
+                <tr style="background:#e9ecef;">
+                    <th style="padding:10px; text-align:left;">
+                        Tên thuốc
+                    </th>
+
+                    <th style="padding:10px;">
+                        Số lượng
+                    </th>
+
+                    <th style="padding:10px;">
+                        Đơn giá
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {#for item in items}
+                <tr>
+                    <td style="padding:10px; border-bottom:1px solid #ddd;">
+                        {item.medicineName}
+                    </td>
+
+                    <td style="padding:10px; text-align:center;
+                               border-bottom:1px solid #ddd;">
+                        {item.quantity}
+                    </td>
+
+                    <td style="padding:10px; text-align:right;
+                               border-bottom:1px solid #ddd;">
+                        {item.unitPrice} VNĐ
+                    </td>
+                </tr>
+                {/for}
+            </tbody>
+
+        </table>
+
+        <p style="margin-top:25px;">
+            Chúng tôi sẽ tiếp tục cập nhật trạng thái đơn hàng
+            cho bạn qua email.
+        </p>
+
+        <p>
+            Trân trọng,<br>
+            <strong>Đội ngũ Pharmacy</strong>
+        </p>
+
+    </div>
+
+    <div style="background:#f1f5f9; padding:15px;
+                text-align:center; color:#777; font-size:12px;">
+
+        Email được gửi tự động từ hệ thống Pharmacy.
+        Vui lòng không trả lời email này.
+
+    </div>
+
+</div>
+
+</body>
+</html>
